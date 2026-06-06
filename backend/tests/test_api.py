@@ -104,3 +104,20 @@ def test_vendor_cannot_approve_orders(client, seed_data):
     vendor = login(client, "vendor@test.dev")
     res = client.post(f"/procurement/orders/{po['id']}/approve", headers=vendor)
     assert res.status_code == 403
+
+
+def test_material_out_exposes_reserve_and_available(client, seed_data):
+    headers = login(client, "stock@test.dev")
+    materials = client.get("/materials", headers=headers).json()
+    cement = next(m for m in materials if m["name"] == "Cement")
+    assert {"reserved_quantity", "available_stock", "below_reserve"} <= cement.keys()
+    assert cement["available_stock"] == cement["current_stock"] - cement["reserved_quantity"]
+
+
+def test_expiry_endpoint_lists_expiring_batches(client, seed_data):
+    headers = login(client, "manager@test.dev")
+    res = client.get("/stock/expiry", headers=headers)
+    assert res.status_code == 200
+    items = res.json()
+    # The seeded Cement has a batch expiring in ~4 days.
+    assert any(i["material_name"] == "Cement" and i["expiry_status"] == "expiring" for i in items)

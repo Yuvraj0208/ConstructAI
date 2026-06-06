@@ -10,8 +10,16 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import get_current_user, require_role
-from ..models import Material, MovementType, Role, StockMovement, User
-from ..schemas import MovementCreate, MovementOut
+from ..models import Material, MovementType, Role, StockBatch, StockMovement, User
+from ..schemas import MovementCreate, MovementOut, StockBatchOut
+from ..services.inventory import (
+    EXPIRY_SOON_DAYS,
+    add_batch,
+    consume_fifo,
+    days_to_expiry,
+    expiry_status,
+    recompute_stock,
+)
 
 router = APIRouter(prefix="/stock", tags=["stock"])
 
@@ -36,9 +44,14 @@ def record_movement(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found")
 
     signed = _signed_quantity(payload.movement_type, payload.quantity)
-    new_balance = material.current_stock + signed
+    # Stock-on-hand is tracked as batches: intake creates a batch, consumption draws
+    # down oldest-expiry-first. current_stock is then recomputed from the batches.
+    if signed > 0:
+        add_batch(db, material, signed, note=payload.note)
+    elif signed < 0:
+        consume_fifo(db, material, -signed)
+    new_balance = recompute_stock(db, material)
 
-    material.current_stock = new_balance
     movement = StockMovement(
         material_id=material.id,
         quantity=signed,
@@ -102,3 +115,69 @@ def daily_usage(
         day = (today - timedelta(days=i)).isoformat()
         series.append({"date": day, "consumed": consumed.get(day, 0.0), "delivered": delivered.get(day, 0.0)})
     return series
+
+
+def _batch_to_out(batch: StockBatch) -> StockBatchOut:
+    material = batch.material
+    return StockBatchOut(
+        id=batch.id,
+        material_id=batch.material_id,
+        material_name=material.name if material else None,
+        unit=material.unit if material else None,
+        original_quantity=batch.original_quantity,
+        remaining_quantity=batch.remaining_quantity,
+        received_at=batch.received_at,
+        expiry_date=batch.expiry_date,
+        days_to_expiry=days_to_expiry(batch.expiry_date),
+        expiry_status=expiry_status(batch.expiry_date),
+        note=batch.note,
+    )
+
+
+@router.get("/batches", response_model=list[StockBatchOut])
+def list_batches(
+    material_id: int | None = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[StockBatchOut]:
+    """Active (non-empty) stock batches, soonest-expiry first."""
+    stmt = (
+        select(StockBatch)
+        .where(StockBatch.remaining_quantity > 0)
+        .order_by(
+            StockBatch.expiry_date.is_(None).asc(),
+            StockBatch.expiry_date.asc(),
+            StockBatch.received_at.asc(),
+        )
+    )
+    if material_id is not None:
+        stmt = stmt.where(StockBatch.material_id == material_id)
+    return [_batch_to_out(b) for b in db.scalars(stmt).all()]
+
+
+@router.get("/expiry", response_model=list[StockBatchOut])
+def expiring_batches(
+    days: int = EXPIRY_SOON_DAYS,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[StockBatchOut]:
+    """Batches in your industry that are already expired or expiring within `days`."""
+    stmt = (
+        select(StockBatch)
+        .join(Material, StockBatch.material_id == Material.id)
+        .where(
+            Material.industry_id == user.industry_id,
+            StockBatch.remaining_quantity > 0,
+            StockBatch.expiry_date.is_not(None),
+        )
+        .order_by(StockBatch.expiry_date.asc())
+    )
+    cutoff = datetime.now(timezone.utc) + timedelta(days=days)
+    result: list[StockBatchOut] = []
+    for batch in db.scalars(stmt).all():
+        expiry = batch.expiry_date
+        if expiry.tzinfo is None:  # SQLite returns naive datetimes
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry <= cutoff:
+            result.append(_batch_to_out(batch))
+    return result

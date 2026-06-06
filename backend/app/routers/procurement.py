@@ -20,6 +20,7 @@ from ..models import (
     Vendor,
 )
 from ..schemas import PurchaseOrderOut, RunResult, WeatherOut
+from ..services.inventory import add_batch, recompute_stock
 from ..services.procurement import generate_suggestions
 
 router = APIRouter(prefix="/procurement", tags=["procurement"])
@@ -177,14 +178,17 @@ def receive_order(
     if material is None:
         raise HTTPException(status_code=404, detail="Material not found")
 
-    material.current_stock += po.quantity
+    # Received goods become a new batch (with its own expiry); stock is recomputed.
+    vendor_name = po.vendor.name if po.vendor else "vendor"
+    add_batch(db, material, po.quantity, note=f"PO #{po.id} from {vendor_name}")
+    new_balance = recompute_stock(db, material)
     db.add(
         StockMovement(
             material_id=material.id,
             quantity=po.quantity,
             movement_type=MovementType.DELIVERY,
-            note=f"PO #{po.id} received from {po.vendor.name if po.vendor else 'vendor'}",
-            balance_after=material.current_stock,
+            note=f"PO #{po.id} received from {vendor_name}",
+            balance_after=new_balance,
             created_by_id=user.id,
         )
     )

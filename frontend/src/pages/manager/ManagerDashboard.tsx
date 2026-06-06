@@ -17,6 +17,7 @@ import { Layout } from '../../components/Layout';
 import { Card, fmtMoney, fmtNum, inputClass, Spinner, StatusBadge } from '../../components/ui';
 import { WeatherPanel } from './WeatherPanel';
 import { ProcurementPanel } from './ProcurementPanel';
+import { ExpiryPanel } from './ExpiryPanel';
 import type { DailyUsage, Material, Offer } from '../../types';
 
 const STATUS_BAR: Record<string, string> = {
@@ -134,6 +135,11 @@ export default function ManagerDashboard() {
         <WeatherPanel city={user?.city} />
       </div>
 
+      {/* Expiry alerts (only renders when something is expiring/expired) */}
+      <div className="mt-6 empty:mt-0">
+        <ExpiryPanel />
+      </div>
+
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* Stock overview */}
         <Card className="lg:col-span-1">
@@ -147,9 +153,12 @@ export default function ManagerDashboard() {
           ) : (
             <div className="divide-y divide-slate-100">
               {materials.map((m) => {
-                const pct = m.target_stock > 0 ? Math.min(100, (m.current_stock / m.target_stock) * 100) : 0;
-                const threshPct =
-                  m.target_stock > 0 ? Math.min(100, (m.threshold / m.target_stock) * 100) : 0;
+                const cap = m.target_stock > 0 ? m.target_stock : 1;
+                const currentPct = Math.min(100, (m.current_stock / cap) * 100);
+                const reservePct = Math.min(100, (m.reserved_quantity / cap) * 100);
+                const grayPct = Math.min(reservePct, currentPct); // reserved stock physically on hand
+                const availFillPct = Math.max(0, currentPct - grayPct); // usable stock, above the reserve
+                const threshPct = Math.min(100, (m.threshold / cap) * 100);
                 return (
                   <button
                     key={m.id}
@@ -164,20 +173,38 @@ export default function ManagerDashboard() {
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="relative h-2 flex-1 rounded-full bg-slate-100">
+                        {grayPct > 0 && (
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-l-full bg-slate-300"
+                            style={{ width: `${grayPct}%` }}
+                            title="Reserved safety stock"
+                          />
+                        )}
                         <div
-                          className="absolute inset-y-0 left-0 rounded-full"
-                          style={{ width: `${pct}%`, backgroundColor: STATUS_BAR[m.status] }}
+                          className="absolute inset-y-0 rounded-r-full"
+                          style={{ left: `${grayPct}%`, width: `${availFillPct}%`, backgroundColor: STATUS_BAR[m.status] }}
                         />
                         <div
-                          className="absolute inset-y-[-2px] w-px bg-slate-400"
+                          className="absolute inset-y-[-2px] w-px bg-slate-500"
                           style={{ left: `${threshPct}%` }}
                           title="Reorder threshold"
                         />
                       </div>
-                      <span className="w-28 text-right text-xs text-slate-500">
-                        {fmtNum(m.current_stock)}/{fmtNum(m.target_stock)} {m.unit}
+                      <span
+                        className="w-24 text-right text-xs text-slate-500"
+                        title={`${fmtNum(m.current_stock)} ${m.unit} on hand`}
+                      >
+                        {fmtNum(m.available_stock)} avail
                       </span>
                     </div>
+                    {m.reserved_quantity > 0 && (
+                      <div className="mt-1 text-[11px] text-slate-400">
+                        {fmtNum(m.current_stock)} on hand · {fmtNum(m.reserved_quantity)} {m.unit} reserved
+                        {m.below_reserve && (
+                          <span className="font-semibold text-rose-500"> · ⚠ into reserve</span>
+                        )}
+                      </div>
+                    )}
                   </button>
                 );
               })}

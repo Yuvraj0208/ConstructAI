@@ -13,9 +13,12 @@ def make_offer(price, eta, qty, *, rating=3.0, vid=1, oid=1, active=True):
     )
 
 
-def make_material(current, threshold, target, unit="bags", name="Cement"):
+def make_material(current, threshold, target, unit="bags", name="Cement", reserve_percent=0.0):
+    reserved = round(reserve_percent / 100.0 * target, 2) if target > 0 else 0.0
     return SimpleNamespace(
-        current_stock=current, threshold=threshold, target_stock=target, unit=unit, name=name
+        current_stock=current, threshold=threshold, target_stock=target, unit=unit, name=name,
+        reserve_percent=reserve_percent, reserved_quantity=reserved,
+        available_stock=round(current - reserved, 2),
     )
 
 

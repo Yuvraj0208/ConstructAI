@@ -85,8 +85,13 @@ def plan_material(material: Material, offers: list[VendorOffer], rain_buffer: bo
     if not active:
         return []
 
-    urgency = compute_urgency(material.current_stock, material.threshold)
-    level = "Critical" if material.current_stock <= 0.5 * material.threshold else "Low"
+    # Urgency & status are based on AVAILABLE stock (current minus the safety reserve).
+    urgency = compute_urgency(material.available_stock, material.threshold)
+    level = "Critical" if material.available_stock <= 0.5 * material.threshold else "Low"
+
+    reserve_note = ""
+    if material.reserved_quantity > 0:
+        reserve_note = f"; {_fmt(material.reserved_quantity)} {material.unit} reserved"
 
     target = material.target_stock if material.target_stock > material.current_stock else material.threshold
     deficit = max(0.0, target - material.current_stock)
@@ -121,10 +126,10 @@ def plan_material(material: Material, offers: list[VendorOffer], rain_buffer: bo
             reasons.append("best price/speed balance" if idx == 0 else "covers the remaining shortfall")
 
         rationale = (
-            f"{level} stock ({_fmt(material.current_stock)}/{_fmt(material.threshold)} "
-            f"{material.unit}). Need ~{_fmt(deficit)} {material.unit}{buffer_note}. "
-            f"Chose {offer.vendor.name if offer.vendor else 'vendor'} — {', '.join(reasons)} "
-            f"(₹{_fmt(offer.price_per_unit)}/{material.unit}, {offer.eta_days}d)."
+            f"{level}: {_fmt(material.available_stock)}/{_fmt(material.threshold)} "
+            f"{material.unit} available{reserve_note}. Order ~{_fmt(deficit)} "
+            f"{material.unit}{buffer_note}. Chose {offer.vendor.name if offer.vendor else 'vendor'} "
+            f"— {', '.join(reasons)} (₹{_fmt(offer.price_per_unit)}/{material.unit}, {offer.eta_days}d)."
         )
         plans.append(PlannedOrder(offer=offer, quantity=qty, rationale=rationale))
         remaining -= qty

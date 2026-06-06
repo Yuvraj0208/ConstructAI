@@ -106,6 +106,11 @@ class Material(Base):
     target_stock: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     # Materials like cement/sand degrade in rain -> the weather module buffers these.
     weather_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Perishability: null = never expires. Each delivery becomes a batch that expires
+    # `shelf_life_days` after it was received.
+    shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Untouchable safety stock, as a percent of target_stock (e.g. 15 => keep 15% in reserve).
+    reserve_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     industry_id: Mapped[int] = mapped_column(ForeignKey("industries.id"), nullable=False)
@@ -114,15 +119,36 @@ class Material(Base):
     movements: Mapped[list["StockMovement"]] = relationship(
         back_populates="material", cascade="all, delete-orphan"
     )
+    batches: Mapped[list["StockBatch"]] = relationship(
+        back_populates="material", cascade="all, delete-orphan"
+    )
+
+    @property
+    def reserved_quantity(self) -> float:
+        """Untouchable safety stock (absolute units)."""
+        if self.target_stock <= 0 or self.reserve_percent <= 0:
+            return 0.0
+        return round(self.reserve_percent / 100.0 * self.target_stock, 2)
+
+    @property
+    def available_stock(self) -> float:
+        """Stock that may actually be used (current minus the reserve)."""
+        return round(self.current_stock - self.reserved_quantity, 2)
+
+    @property
+    def below_reserve(self) -> bool:
+        """True when stock has dipped into the safety reserve."""
+        return self.current_stock < self.reserved_quantity
 
     @property
     def status(self) -> str:
-        """Health of this material's stock level."""
+        """Health of the *available* (non-reserved) stock vs. the reorder threshold."""
         if self.threshold <= 0:
             return "ok"
-        if self.current_stock <= 0.5 * self.threshold:
+        available = self.available_stock
+        if available <= 0.5 * self.threshold:
             return "critical"
-        if self.current_stock <= self.threshold:
+        if available <= self.threshold:
             return "low"
         return "ok"
 
@@ -144,6 +170,28 @@ class StockMovement(Base):
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     material: Mapped["Material"] = relationship(back_populates="movements")
+
+
+class StockBatch(Base):
+    """A received lot of a material, with its own expiry date.
+
+    Stock-on-hand is the sum of batch `remaining_quantity`. Consumption draws down
+    batches oldest-expiry-first (FIFO), which powers accurate expiry alerts.
+    """
+
+    __tablename__ = "stock_batches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id"), nullable=False, index=True)
+    original_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    remaining_quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, index=True)
+    # Null for non-perishable materials.
+    expiry_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    material: Mapped["Material"] = relationship(back_populates="batches")
 
 
 class Vendor(Base):

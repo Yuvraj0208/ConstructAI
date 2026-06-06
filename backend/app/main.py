@@ -7,15 +7,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .database import Base, engine
 from .routers import auth, industries, materials, procurement, stock, vendors, weather
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables on startup. For schema changes during early dev, delete the
-    # SQLite file and reseed (we'll switch to Alembic migrations later).
-    Base.metadata.create_all(bind=engine)
+    # Schema is managed by Alembic migrations (`alembic upgrade head`) — not
+    # auto-created here, so the app never silently drifts from the migrations.
     yield
 
 

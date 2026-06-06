@@ -15,12 +15,13 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from .database import Base, SessionLocal, engine
+from .database import Base, SessionLocal
 from .models import (
     Industry,
     Material,
     MovementType,
     Role,
+    StockBatch,
     StockMovement,
     User,
     Vendor,
@@ -50,6 +51,9 @@ def _build_material_with_history(
     deliveries: list[tuple[int, float]],
     anomaly: tuple[int, float] | None = None,
     creator_id: int,
+    reserve_percent: float = 0.0,
+    shelf_life_days: int | None = None,
+    batches: list[tuple[int, float]] | None = None,
 ) -> Material:
     """Create a material plus a realistic 14-day movement ledger.
 
@@ -80,6 +84,8 @@ def _build_material_with_history(
         threshold=threshold,
         target_stock=target,
         weather_sensitive=weather_sensitive,
+        shelf_life_days=shelf_life_days,
+        reserve_percent=reserve_percent,
         industry_id=industry_id,
         current_stock=opening,
     )
@@ -117,6 +123,27 @@ def _build_material_with_history(
         )
 
     material.current_stock = balance
+
+    # Current on-hand stock, modelled as batches (so expiry/FIFO is realistic).
+    # Default: one fresh batch holding all of it. Perishables pass explicit batches
+    # (with varied ages) to demo expired / expiring-soon / fresh lots.
+    batch_specs = batches if batches is not None else [(4, desired_final)]
+    on_hand = 0.0
+    for days_ago, qty in batch_specs:
+        received = _now() - timedelta(days=days_ago)
+        expiry = received + timedelta(days=shelf_life_days) if shelf_life_days else None
+        db.add(
+            StockBatch(
+                material_id=material.id,
+                original_quantity=qty,
+                remaining_quantity=qty,
+                received_at=received,
+                expiry_date=expiry,
+                note="Opening lot",
+            )
+        )
+        on_hand += qty
+    material.current_stock = round(on_hand, 2)
     return material
 
 
@@ -134,14 +161,32 @@ def _create_user(db, *, email, full_name, role, city, industry_id) -> User:
     return user
 
 
-def seed(reset: bool = False) -> None:
-    if reset:
-        print("Dropping all tables...")
-        Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+def _schema_ready(db) -> bool:
+    """True if the tables exist (i.e. `alembic upgrade head` has been run)."""
+    try:
+        db.execute(select(Industry).limit(1))
+        return True
+    except Exception:
+        db.rollback()
+        return False
 
+
+def _wipe_data(db) -> None:
+    """Delete all rows (FK-safe order). Schema is left intact — Alembic owns it."""
+    print("Clearing existing data...")
+    for table in reversed(Base.metadata.sorted_tables):
+        db.execute(table.delete())
+    db.commit()
+
+
+def seed(reset: bool = False) -> None:
     db = SessionLocal()
     try:
+        if not _schema_ready(db):
+            print("Schema not found. Create it first with:  alembic upgrade head")
+            return
+        if reset:
+            _wipe_data(db)
         if db.scalar(select(Industry)) is not None:
             print("Database already seeded. Use --reset to wipe and reseed.")
             return
@@ -186,45 +231,53 @@ def seed(reset: bool = False) -> None:
         cement = _build_material_with_history(
             db, industry_id=construction.id, name="Cement", unit="bags",
             threshold=100, target=500, weather_sensitive=True,
-            desired_final=80, avg_daily=30, deliveries=[(10, 200), (4, 150)],
+            desired_final=150, avg_daily=30, deliveries=[(10, 200), (4, 150)],
             anomaly=(5, 130), creator_id=handler.id,
+            reserve_percent=15, shelf_life_days=90,
+            # Varied ages: 10 already expired, 30 expiring in ~2 days, then fresher lots.
+            batches=[(95, 10), (88, 30), (50, 50), (3, 60)],
         )
         sand = _build_material_with_history(
             db, industry_id=construction.id, name="Sand", unit="tons",
             threshold=20, target=100, weather_sensitive=True,
-            desired_final=12, avg_daily=6, deliveries=[(10, 40), (4, 30)],
-            creator_id=handler.id,
+            desired_final=25, avg_daily=6, deliveries=[(10, 40), (4, 30)],
+            creator_id=handler.id, reserve_percent=10,
         )
         bricks = _build_material_with_history(
             db, industry_id=construction.id, name="Bricks", unit="pieces",
             threshold=5000, target=20000, weather_sensitive=False,
             desired_final=9000, avg_daily=600, deliveries=[(10, 8000), (4, 6000)],
-            creator_id=handler.id,
+            creator_id=handler.id, reserve_percent=5,
         )
         steel = _build_material_with_history(
             db, industry_id=construction.id, name="Steel Rods", unit="tons",
             threshold=10, target=50, weather_sensitive=False,
-            desired_final=4, avg_daily=2, deliveries=[(10, 12), (4, 10)],
-            creator_id=handler.id,
+            desired_final=6, avg_daily=2, deliveries=[(10, 12), (4, 10)],
+            creator_id=handler.id, reserve_percent=10,
         )
         gravel = _build_material_with_history(
             db, industry_id=construction.id, name="Gravel", unit="tons",
             threshold=15, target=60, weather_sensitive=True,
             desired_final=45, avg_daily=4, deliveries=[(10, 30), (4, 20)],
-            creator_id=handler.id,
+            creator_id=handler.id, reserve_percent=10,
         )
 
         # --- Electrical materials (lightweight, no long history) --------- #
-        for name, unit, threshold, target, current in [
-            ("Copper Wire", "meters", 500, 2000, 1500),
-            ("PVC Conduit", "pieces", 300, 1500, 250),
+        for name, unit, threshold, target, current, reserve in [
+            ("Copper Wire", "meters", 500, 2000, 1500, 10),
+            ("PVC Conduit", "pieces", 300, 1500, 250, 10),
         ]:
             m = Material(
                 name=name, unit=unit, threshold=threshold, target_stock=target,
-                weather_sensitive=False, industry_id=electrical.id, current_stock=current,
+                weather_sensitive=False, reserve_percent=reserve,
+                industry_id=electrical.id, current_stock=current,
             )
             db.add(m)
             db.flush()
+            db.add(StockBatch(
+                material_id=m.id, original_quantity=current, remaining_quantity=current,
+                received_at=_now() - timedelta(days=10), expiry_date=None, note="Opening lot",
+            ))
             db.add(StockMovement(
                 material_id=m.id, quantity=current, movement_type=MovementType.INITIAL,
                 note="Opening stock", balance_after=current, created_by_id=manager.id,

@@ -1,16 +1,18 @@
 # ConstructAI — Material Procurement Platform
 
-An AI-ready material procurement system. It tracks material stock, lets vendors
-post price + delivery ETA, and (next milestone) auto-reorders by balancing price
-against delivery speed when stock dips below threshold — with a manager approving.
+An AI-ready material procurement system. It tracks material stock (with per-batch
+expiry and safety-stock reserves), lets vendors post price + delivery ETA, and
+auto-reorders by balancing price against delivery speed when stock dips below
+threshold — with a manager approving.
 
 Built **industry-agnostic**: start with construction (cement, sand, bricks…),
 extend to electrical / plumbing / manufacturing without code changes.
 
-> Status: **Milestones 1 & 2 complete** and verified end-to-end — auth + 3 role
-> dashboards, stock ledger, vendor offers, usage analytics with anomaly detection,
-> the **auto-procurement engine** (price-vs-ETA-vs-urgency scoring + approval flow),
-> and the **weather module** (live forecast + rain buffer). See the [roadmap](#roadmap).
+> Status: **Milestones 1 & 2 + extras complete** and verified end-to-end — auth + 3
+> role dashboards, stock ledger, vendor offers, usage analytics with anomaly detection,
+> the **auto-procurement engine** (price-vs-ETA-vs-urgency + approval flow), the
+> **weather module** (live forecast + rain buffer), **per-batch expiry tracking** (FIFO),
+> and **reserve safety stock** per material. Runs on **PostgreSQL**. See the [roadmap](#roadmap).
 
 ---
 
@@ -24,7 +26,7 @@ extend to electrical / plumbing / manufacturing without code changes.
 
 ## Tech stack
 
-- **Backend:** FastAPI (Python 3.14) · SQLAlchemy · SQLite (dev) · JWT auth
+- **Backend:** FastAPI (Python 3.14) · SQLAlchemy · PostgreSQL (psycopg; SQLite also supported) · JWT auth
 - **Frontend:** React 19 + TypeScript · Vite · Tailwind CSS v4 · Recharts · React Router
 
 ## Project structure
@@ -41,9 +43,10 @@ ConstructAI/
 │  │  ├─ security.py      # password hashing (PBKDF2) + JWT
 │  │  ├─ deps.py          # current-user + role guards
 │  │  ├─ seed.py          # demo data (run with --reset to wipe)
-│  │  ├─ services/        # procurement engine + weather provider (the "brain")
+│  │  ├─ services/        # procurement engine + weather + inventory (batches/FIFO/expiry)
 │  │  └─ routers/         # auth, industries, materials, stock, vendors, procurement, weather
 │  ├─ tests/             # pytest: engine unit tests + API integration tests
+│  ├─ alembic/           # database migrations (run: alembic upgrade head)
 │  └─ requirements.txt
 └─ frontend/
    └─ src/
@@ -58,21 +61,40 @@ ConstructAI/
 
 ## Running it
 
-You need **Python 3.14** and **Node 18+** (Node 24 tested).
+You need **Python 3.14**, **Node 18+** (Node 24 tested), and **PostgreSQL**.
 
-### 1. Backend (terminal 1)
+### 1. Database (PostgreSQL)
+
+Create the database, then point the backend at it via `backend/.env`:
+
+```sql
+-- in psql or pgAdmin
+CREATE DATABASE constructai;
+```
+
+```powershell
+cd backend
+copy .env.example .env
+# then edit .env and set your password in DATABASE_URL:
+#   postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/constructai
+```
+
+> Prefer zero-setup? Set `DATABASE_URL=sqlite:///./constructai.db` in `.env` instead.
+
+### 2. Backend (terminal 1)
 
 ```powershell
 cd backend
 python -m venv .venv                 # first time only
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt   # first time only
-.\.venv\Scripts\python.exe -m app.seed --reset    # load demo data (first time / to reset)
+.\.venv\Scripts\python.exe -m alembic upgrade head   # create/upgrade the schema (migrations)
+.\.venv\Scripts\python.exe -m app.seed --reset       # load demo data (data only)
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
 API runs at http://localhost:8000 — interactive docs at http://localhost:8000/docs
 
-### 2. Frontend (terminal 2)
+### 3. Frontend (terminal 2)
 
 ```powershell
 cd frontend
@@ -100,8 +122,9 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-14 tests: procurement-engine unit tests (urgency, scoring, allocation, rain buffer)
-+ API integration tests (auth, role guards, and the full suggest→approve→accept→receive lifecycle).
+21 tests: engine unit tests (urgency, scoring, allocation, rain buffer), inventory tests
+(reserve/available, batch FIFO, expiry buckets), and API integration tests (auth, role
+guards, reserve fields, expiry alerts, and the full suggest→approve→accept→receive lifecycle).
 
 ---
 
@@ -120,11 +143,20 @@ cd backend
       vendor when critically low)
 - [x] Order lifecycle: manager **approve/reject** → vendor **accepts** → stock handler
       **receives** (auto stock movement). Vendors see their incoming orders.
-- [x] Hardened: 14 automated tests, code-split bundle, 401 auto-logout, ≥32-byte JWT secret
+- [x] Hardened: automated tests, code-split bundle, 401 auto-logout, ≥32-byte JWT secret
 
 **Weather module (done)**
 - [x] City-wise live forecast (Open-Meteo, key-less; offline simulation fallback)
 - [x] +20% rain buffer applied to weather-sensitive materials during reorder
+
+**Inventory depth & PostgreSQL (done)**
+- [x] Migrated to **PostgreSQL** (psycopg); still SQLite-compatible for tests/dev
+- [x] **Per-batch expiry** — deliveries become batches; consumption is FIFO (oldest
+      expiry first); manager sees expired / expiring-soon alerts
+- [x] **Reserve safety stock** — a `reserve_percent` per material held back; status and
+      the engine work off *available* (current − reserved) stock
+- [x] **Alembic migrations** manage the schema (no more auto-create on startup)
+- [x] 21 automated tests covering the above
 
 **Milestone 3 — AI layer (next)**
 - [ ] Agents to interlink procurement with budgeting & scheduling; contextual RAG
@@ -134,7 +166,8 @@ cd backend
 
 ## Notes
 
-- The dev database is a local SQLite file (`backend/constructai.db`, git-ignored).
-  Schema changes during early dev: re-run `python -m app.seed --reset`.
+- Configure the database via `backend/.env` (`DATABASE_URL`). **Schema is managed by
+  Alembic** — after editing models, run `alembic revision --autogenerate -m "..."` then
+  `alembic upgrade head`. `python -m app.seed --reset` resets the demo **data** only.
 - `SECRET_KEY` defaults to a dev value — set a real one via `backend/.env`
   (copy `.env.example`) before any real deployment.

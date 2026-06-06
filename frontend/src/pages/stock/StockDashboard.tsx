@@ -116,7 +116,9 @@ export default function StockDashboard() {
                 <thead>
                   <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
                     <th className="px-5 py-2 font-medium">Material</th>
-                    <th className="px-5 py-2 text-right font-medium">In stock</th>
+                    <th className="px-5 py-2 text-right font-medium">On hand</th>
+                    <th className="px-5 py-2 text-right font-medium">Available</th>
+                    <th className="px-5 py-2 text-right font-medium">Reserved</th>
                     <th className="px-5 py-2 text-right font-medium">Threshold</th>
                     <th className="px-5 py-2 text-center font-medium">Status</th>
                   </tr>
@@ -124,9 +126,29 @@ export default function StockDashboard() {
                 <tbody className="divide-y divide-slate-100">
                   {materials.map((m) => (
                     <tr key={m.id} className="hover:bg-slate-50">
-                      <td className="px-5 py-3 font-medium text-slate-800">{m.name}</td>
+                      <td className="px-5 py-3 font-medium text-slate-800">
+                        {m.name}
+                        {m.shelf_life_days != null && (
+                          <span
+                            className="ml-1.5 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600"
+                            title={`Perishable · ${m.shelf_life_days}-day shelf life`}
+                          >
+                            perishable
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-right text-slate-700">
                         {fmtNum(m.current_stock)} <span className="text-slate-400">{m.unit}</span>
+                      </td>
+                      <td
+                        className={`px-5 py-3 text-right font-medium ${
+                          m.below_reserve ? 'text-rose-600' : 'text-slate-700'
+                        }`}
+                      >
+                        {fmtNum(m.available_stock)}
+                      </td>
+                      <td className="px-5 py-3 text-right text-slate-400">
+                        {fmtNum(m.reserved_quantity)}
                       </td>
                       <td className="px-5 py-3 text-right text-slate-500">{fmtNum(m.threshold)}</td>
                       <td className="px-5 py-3 text-center">
@@ -136,7 +158,7 @@ export default function StockDashboard() {
                   ))}
                   {materials.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="px-5 py-8 text-center text-slate-400">
+                      <td colSpan={6} className="px-5 py-8 text-center text-slate-400">
                         No materials yet.
                       </td>
                     </tr>

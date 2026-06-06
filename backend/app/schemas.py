@@ -66,6 +66,8 @@ class MaterialCreate(BaseModel):
     threshold: float = 0.0
     target_stock: float = 0.0
     weather_sensitive: bool = False
+    shelf_life_days: int | None = None
+    reserve_percent: float = 0.0
     industry_id: int
     initial_stock: float = 0.0
 
@@ -76,6 +78,8 @@ class MaterialUpdate(BaseModel):
     threshold: float | None = None
     target_stock: float | None = None
     weather_sensitive: bool | None = None
+    shelf_life_days: int | None = None
+    reserve_percent: float | None = None
 
 
 class MaterialOut(BaseModel):
@@ -88,6 +92,11 @@ class MaterialOut(BaseModel):
     threshold: float
     target_stock: float
     weather_sensitive: bool
+    shelf_life_days: int | None = None
+    reserve_percent: float
+    reserved_quantity: float
+    available_stock: float
+    below_reserve: bool
     industry_id: int
     status: str
     created_at: datetime
@@ -116,6 +125,23 @@ class MovementOut(BaseModel):
     balance_after: float
     created_at: datetime
     created_by_id: int | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Stock batches (expiry / FIFO)
+# --------------------------------------------------------------------------- #
+class StockBatchOut(BaseModel):
+    id: int
+    material_id: int
+    material_name: str | None = None
+    unit: str | None = None
+    original_quantity: float
+    remaining_quantity: float
+    received_at: datetime
+    expiry_date: datetime | None = None
+    days_to_expiry: int | None = None
+    expiry_status: str  # fresh | expiring | expired
+    note: str | None = None
 
 
 # --------------------------------------------------------------------------- #

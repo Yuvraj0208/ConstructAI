@@ -9,6 +9,7 @@ from ..database import get_db
 from ..deps import get_current_user, require_role
 from ..models import Material, MovementType, Role, StockMovement, User
 from ..schemas import MaterialCreate, MaterialOut, MaterialUpdate
+from ..services.inventory import add_batch, recompute_stock
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
@@ -49,20 +50,24 @@ def create_material(
         threshold=payload.threshold,
         target_stock=payload.target_stock,
         weather_sensitive=payload.weather_sensitive,
+        shelf_life_days=payload.shelf_life_days,
+        reserve_percent=payload.reserve_percent,
         industry_id=payload.industry_id,
-        current_stock=payload.initial_stock,
+        current_stock=0.0,
     )
     db.add(material)
     db.flush()
 
     if payload.initial_stock:
+        add_batch(db, material, payload.initial_stock, note="Opening stock")
+        recompute_stock(db, material)
         db.add(
             StockMovement(
                 material_id=material.id,
                 quantity=payload.initial_stock,
                 movement_type=MovementType.INITIAL,
                 note="Opening stock",
-                balance_after=payload.initial_stock,
+                balance_after=material.current_stock,
                 created_by_id=user.id,
             )
         )

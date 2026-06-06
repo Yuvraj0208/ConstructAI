@@ -1,6 +1,8 @@
 """Shared pytest fixtures: an isolated in-memory DB, a TestClient, and seed data."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -9,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Industry, Material, Role, User, Vendor, VendorOffer
+from app.models import Industry, Material, Role, StockBatch, User, Vendor, VendorOffer
 from app.security import hash_password
 
 # A weather forecast stub so tests never hit the network (and are deterministic).
@@ -90,10 +92,19 @@ def seed_data(db_session):
 
     cement = Material(
         name="Cement", unit="bags", current_stock=80, threshold=100, target_stock=500,
-        weather_sensitive=True, industry_id=industry.id,
+        weather_sensitive=True, shelf_life_days=90, reserve_percent=0, industry_id=industry.id,
     )
     db_session.add(cement)
     db_session.flush()
+
+    # Stock-on-hand = two batches (one expiring soon) summing to 80.
+    now = datetime.now(timezone.utc)
+    db_session.add_all([
+        StockBatch(material_id=cement.id, original_quantity=70, remaining_quantity=70,
+                   received_at=now, expiry_date=now + timedelta(days=80), note="fresh"),
+        StockBatch(material_id=cement.id, original_quantity=10, remaining_quantity=10,
+                   received_at=now - timedelta(days=86), expiry_date=now + timedelta(days=4), note="expiring"),
+    ])
 
     # vendor1 is cheaper AND faster -> engine should pick it and it has enough qty.
     db_session.add_all([

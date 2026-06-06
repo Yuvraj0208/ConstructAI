@@ -29,9 +29,30 @@ export interface Material {
   threshold: number;
   target_stock: number;
   weather_sensitive: boolean;
+  shelf_life_days?: number | null;
+  reserve_percent: number;
+  reserved_quantity: number;
+  available_stock: number;
+  below_reserve: boolean;
   industry_id: number;
   status: MaterialStatus;
   created_at: string;
+}
+
+export type ExpiryStatus = 'fresh' | 'expiring' | 'expired';
+
+export interface StockBatch {
+  id: number;
+  material_id: number;
+  material_name?: string | null;
+  unit?: string | null;
+  original_quantity: number;
+  remaining_quantity: number;
+  received_at: string;
+  expiry_date?: string | null;
+  days_to_expiry?: number | null;
+  expiry_status: ExpiryStatus;
+  note?: string | null;
 }
 
 export type MovementType = 'consumption' | 'delivery' | 'adjustment' | 'initial';
