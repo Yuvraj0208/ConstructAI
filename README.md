@@ -5,8 +5,8 @@ expiry and safety-stock reserves), lets vendors post price + delivery ETA, and
 auto-reorders by balancing price against delivery speed when stock dips below
 threshold — with a manager approving.
 
-Built **industry-agnostic**: start with construction (cement, sand, bricks…),
-extend to electrical / plumbing / manufacturing without code changes.
+Built **industry-agnostic** and shipping with **5 industries** — Construction,
+Electrical, Plumbing, HVAC, and Painting & Finishing — each fully functional.
 
 > Status: **Milestones 1 & 2 + extras complete** and verified end-to-end — auth + 3
 > role dashboards, stock ledger, vendor offers, usage analytics with anomaly detection,
@@ -163,11 +163,14 @@ guards, reserve fields, expiry alerts, and the full suggest→approve→accept�
 - [x] **Alembic migrations** manage the schema (no more auto-create on startup)
 - [x] 21 automated tests covering the above
 
-**Multi-site + Site Engineer (done)**
+**Multi-site, Site Engineer & multi-industry (done)**
 - [x] **Sites** are the operational unit — each owns its own stock/procurement; a
       **site switcher** in the top bar scopes every screen
 - [x] New **Site Engineer** role: daily progress updates (→ manager's Site Progress
       panel) and material requests (→ stock handler issues, drawing stock down FIFO)
+- [x] **5 industries** fully built — Construction, Electrical, Plumbing, HVAC, and
+      Painting — each with sites, materials, vendors/offers, and demo activity. The
+      demo manager/stock/engineer logins roam every site via the switcher.
 - [x] 25 automated tests; data migrations preserve existing rows
 
 **Milestone 3 — AI layer (next)**
