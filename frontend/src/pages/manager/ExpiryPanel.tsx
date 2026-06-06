@@ -16,15 +16,16 @@ function relativeDays(days?: number | null): string {
   return `in ${days}d`;
 }
 
-export function ExpiryPanel() {
+export function ExpiryPanel({ siteId }: { siteId?: number | null }) {
   const [batches, setBatches] = useState<StockBatch[]>([]);
 
   useEffect(() => {
+    if (siteId == null) return;
     api
-      .get<StockBatch[]>('/stock/expiry')
+      .get<StockBatch[]>('/stock/expiry', { params: { site_id: siteId } })
       .then((r) => setBatches(r.data))
       .catch(() => {});
-  }, []);
+  }, [siteId]);
 
   if (batches.length === 0) return null; // nothing to warn about
 

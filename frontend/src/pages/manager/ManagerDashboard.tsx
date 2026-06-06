@@ -11,13 +11,14 @@ import {
   YAxis,
 } from 'recharts';
 import { api } from '../../api/client';
-import { useAuth } from '../../auth/AuthContext';
+import { useSite } from '../../site/SiteContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
-import { Card, fmtMoney, fmtNum, inputClass, Spinner, StatusBadge } from '../../components/ui';
+import { Card, fmtMoney, fmtNum, Spinner, StatusBadge } from '../../components/ui';
 import { WeatherPanel } from './WeatherPanel';
 import { ProcurementPanel } from './ProcurementPanel';
 import { ExpiryPanel } from './ExpiryPanel';
+import { SiteProgressPanel } from './SiteProgressPanel';
 import type { DailyUsage, Material, Offer } from '../../types';
 
 const STATUS_BAR: Record<string, string> = {
@@ -62,10 +63,8 @@ function Kpi({ label, value, tone = 'slate' }: { label: string; value: number; t
 }
 
 export default function ManagerDashboard() {
-  const { user } = useAuth();
-  const { industries, industryId, setIndustryId, materials, loading, reload } = useMaterials(
-    user?.industry_id ?? null,
-  );
+  const { selectedSite, selectedSiteId } = useSite();
+  const { materials, loading, reload } = useMaterials();
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<number | null>(null);
@@ -73,8 +72,11 @@ export default function ManagerDashboard() {
   const [usageLoading, setUsageLoading] = useState(false);
 
   useEffect(() => {
-    api.get<Offer[]>('/vendors/offers').then((res) => setOffers(res.data));
-  }, []);
+    if (selectedSiteId == null) return;
+    api
+      .get<Offer[]>('/vendors/offers', { params: { site_id: selectedSiteId } })
+      .then((res) => setOffers(res.data));
+  }, [selectedSiteId]);
 
   // When the material list changes (e.g. industry switch), pick a sensible default.
   useEffect(() => {
@@ -108,19 +110,6 @@ export default function ManagerDashboard() {
     <Layout
       title="Manager Dashboard"
       subtitle="Stock health, usage analytics, and vendor offers at a glance"
-      actions={
-        <select
-          className={`${inputClass} w-48`}
-          value={industryId ?? ''}
-          onChange={(e) => setIndustryId(Number(e.target.value))}
-        >
-          {industries.map((ind) => (
-            <option key={ind.id} value={ind.id}>
-              {ind.name}
-            </option>
-          ))}
-        </select>
-      }
     >
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -130,14 +119,15 @@ export default function ManagerDashboard() {
         <Kpi label="Active offers" value={offers.length} tone="indigo" />
       </div>
 
-      {/* Weather */}
-      <div className="mt-6">
-        <WeatherPanel city={user?.city} />
+      {/* Weather + site progress */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <WeatherPanel city={selectedSite?.city} siteId={selectedSiteId} />
+        <SiteProgressPanel siteId={selectedSiteId} />
       </div>
 
       {/* Expiry alerts (only renders when something is expiring/expired) */}
       <div className="mt-6 empty:mt-0">
-        <ExpiryPanel />
+        <ExpiryPanel siteId={selectedSiteId} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -267,7 +257,7 @@ export default function ManagerDashboard() {
 
       {/* Auto-procurement engine */}
       <div className="mt-6">
-        <ProcurementPanel onChange={reload} />
+        <ProcurementPanel siteId={selectedSiteId} onChange={reload} />
       </div>
 
       {/* Vendor offers */}

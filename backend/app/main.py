@@ -7,7 +7,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import auth, industries, materials, procurement, stock, vendors, weather
+from .routers import (
+    auth,
+    engineering,
+    industries,
+    materials,
+    procurement,
+    sites,
+    stock,
+    vendors,
+    weather,
+)
 
 
 @asynccontextmanager
@@ -34,11 +44,13 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(industries.router)
+app.include_router(sites.router)
 app.include_router(materials.router)
 app.include_router(stock.router)
 app.include_router(vendors.router)
 app.include_router(procurement.router)
 app.include_router(weather.router)
+app.include_router(engineering.router)
 
 
 @app.get("/", tags=["health"])

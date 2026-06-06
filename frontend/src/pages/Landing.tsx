@@ -15,6 +15,12 @@ const ROLE_CARDS: { key: Role; title: string; emoji: string; desc: string }[] = 
     desc: 'Live dashboards, set reorder thresholds, approve auto-orders, and catch anomalies.',
   },
   {
+    key: 'site_engineer',
+    title: 'Site Engineer',
+    emoji: '👷',
+    desc: 'Send daily progress updates and request the materials needed for the day.',
+  },
+  {
     key: 'vendor',
     title: 'Vendor',
     emoji: '🚚',
@@ -66,7 +72,7 @@ export default function Landing() {
         <p className="mb-4 text-center text-sm font-semibold tracking-wide text-slate-500 uppercase">
           Get started — who are you?
         </p>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ROLE_CARDS.map((r) => (
             <Link
               key={r.key}

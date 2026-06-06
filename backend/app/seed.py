@@ -17,10 +17,14 @@ from sqlalchemy import select
 
 from .database import Base, SessionLocal
 from .models import (
+    DailyUpdate,
     Industry,
     Material,
+    MaterialRequest,
+    MaterialRequestItem,
     MovementType,
     Role,
+    Site,
     StockBatch,
     StockMovement,
     User,
@@ -40,7 +44,7 @@ def _now() -> datetime:
 def _build_material_with_history(
     db,
     *,
-    industry_id: int,
+    site_id: int,
     name: str,
     unit: str,
     threshold: float,
@@ -86,7 +90,7 @@ def _build_material_with_history(
         weather_sensitive=weather_sensitive,
         shelf_life_days=shelf_life_days,
         reserve_percent=reserve_percent,
-        industry_id=industry_id,
+        site_id=site_id,
         current_stock=opening,
     )
     db.add(material)
@@ -206,6 +210,10 @@ def seed(reset: bool = False) -> None:
             db, email="stock@constructai.dev", full_name="Ravi Stock-Handler",
             role=Role.STOCK_HANDLER, city="Mumbai", industry_id=construction.id,
         )
+        engineer = _create_user(
+            db, email="engineer@constructai.dev", full_name="Aarti Site-Engineer",
+            role=Role.SITE_ENGINEER, city="Mumbai", industry_id=construction.id,
+        )
 
         # --- Vendors (each also a login) --------------------------------- #
         vendor_specs = [
@@ -227,9 +235,16 @@ def seed(reset: bool = False) -> None:
             db.flush()
             vendors[company] = vendor
 
-        # --- Construction materials + history ---------------------------- #
+        # --- Sites (a company runs several; switch between them in the UI) - #
+        skyline = Site(name="Skyline Residency", code="SKY", city="Mumbai", industry_id=construction.id)
+        harbor = Site(name="Harbor Bridge", code="HBR", city="Pune", industry_id=construction.id)
+        techpark = Site(name="TechPark Wiring", code="TPK", city="Bangalore", industry_id=electrical.id)
+        db.add_all([skyline, harbor, techpark])
+        db.flush()
+
+        # --- Skyline Residency (construction) materials + history -------- #
         cement = _build_material_with_history(
-            db, industry_id=construction.id, name="Cement", unit="bags",
+            db, site_id=skyline.id, name="Cement", unit="bags",
             threshold=100, target=500, weather_sensitive=True,
             desired_final=150, avg_daily=30, deliveries=[(10, 200), (4, 150)],
             anomaly=(5, 130), creator_id=handler.id,
@@ -238,31 +253,52 @@ def seed(reset: bool = False) -> None:
             batches=[(95, 10), (88, 30), (50, 50), (3, 60)],
         )
         sand = _build_material_with_history(
-            db, industry_id=construction.id, name="Sand", unit="tons",
+            db, site_id=skyline.id, name="Sand", unit="tons",
             threshold=20, target=100, weather_sensitive=True,
             desired_final=25, avg_daily=6, deliveries=[(10, 40), (4, 30)],
             creator_id=handler.id, reserve_percent=10,
         )
         bricks = _build_material_with_history(
-            db, industry_id=construction.id, name="Bricks", unit="pieces",
+            db, site_id=skyline.id, name="Bricks", unit="pieces",
             threshold=5000, target=20000, weather_sensitive=False,
             desired_final=9000, avg_daily=600, deliveries=[(10, 8000), (4, 6000)],
             creator_id=handler.id, reserve_percent=5,
         )
         steel = _build_material_with_history(
-            db, industry_id=construction.id, name="Steel Rods", unit="tons",
+            db, site_id=skyline.id, name="Steel Rods", unit="tons",
             threshold=10, target=50, weather_sensitive=False,
             desired_final=6, avg_daily=2, deliveries=[(10, 12), (4, 10)],
             creator_id=handler.id, reserve_percent=10,
         )
         gravel = _build_material_with_history(
-            db, industry_id=construction.id, name="Gravel", unit="tons",
+            db, site_id=skyline.id, name="Gravel", unit="tons",
             threshold=15, target=60, weather_sensitive=True,
             desired_final=45, avg_daily=4, deliveries=[(10, 30), (4, 20)],
             creator_id=handler.id, reserve_percent=10,
         )
 
-        # --- Electrical materials (lightweight, no long history) --------- #
+        # --- Harbor Bridge (construction) — different stock levels ------- #
+        h_cement = _build_material_with_history(
+            db, site_id=harbor.id, name="Cement", unit="bags",
+            threshold=120, target=600, weather_sensitive=True,
+            desired_final=420, avg_daily=25, deliveries=[(9, 250), (3, 200)],
+            creator_id=handler.id, reserve_percent=15, shelf_life_days=90,
+            batches=[(60, 120), (5, 300)],
+        )
+        h_steel = _build_material_with_history(
+            db, site_id=harbor.id, name="Steel Rods", unit="tons",
+            threshold=12, target=60, weather_sensitive=False,
+            desired_final=8, avg_daily=3, deliveries=[(9, 18), (3, 12)],
+            creator_id=handler.id, reserve_percent=10,
+        )
+        h_gravel = _build_material_with_history(
+            db, site_id=harbor.id, name="Gravel", unit="tons",
+            threshold=20, target=80, weather_sensitive=True,
+            desired_final=70, avg_daily=5, deliveries=[(9, 40), (3, 25)],
+            creator_id=handler.id, reserve_percent=10,
+        )
+
+        # --- TechPark (electrical) materials ----------------------------- #
         for name, unit, threshold, target, current, reserve in [
             ("Copper Wire", "meters", 500, 2000, 1500, 10),
             ("PVC Conduit", "pieces", 300, 1500, 250, 10),
@@ -270,7 +306,7 @@ def seed(reset: bool = False) -> None:
             m = Material(
                 name=name, unit=unit, threshold=threshold, target_stock=target,
                 weather_sensitive=False, reserve_percent=reserve,
-                industry_id=electrical.id, current_stock=current,
+                site_id=techpark.id, current_stock=current,
             )
             db.add(m)
             db.flush()
@@ -299,6 +335,12 @@ def seed(reset: bool = False) -> None:
             (vendors["RapidBuild Traders"], steel, 60000, 2, 30),
             # Gravel
             (vendors["Coastal Aggregates"], gravel, 900, 3, 150),
+            # --- Harbor Bridge site offers ---
+            (vendors["UltraTech Supplies"], h_cement, 385, 2, 700),
+            (vendors["RapidBuild Traders"], h_cement, 415, 1, 350),
+            (vendors["UltraTech Supplies"], h_steel, 56000, 4, 70),
+            (vendors["RapidBuild Traders"], h_steel, 61000, 2, 35),
+            (vendors["Coastal Aggregates"], h_gravel, 920, 3, 160),
         ]
         for vendor, material, price, eta, qty in offers:
             db.add(VendorOffer(
@@ -306,11 +348,40 @@ def seed(reset: bool = False) -> None:
                 price_per_unit=price, eta_days=eta, available_quantity=qty,
             ))
 
+        # --- Site engineer activity at Skyline --------------------------- #
+        db.add_all([
+            DailyUpdate(
+                site_id=skyline.id, author_id=engineer.id, progress_percent=42,
+                summary="Completed 2nd-floor slab shuttering; column casting underway.",
+                labor_count=38, issues="Steel rods running low — may delay column work.",
+                weather_impact="Light rain forecast; covered the cement store.",
+                created_at=_now() - timedelta(days=1, hours=3),
+            ),
+            DailyUpdate(
+                site_id=skyline.id, author_id=engineer.id, progress_percent=45,
+                summary="Block A column casting complete; curing started.",
+                labor_count=41, issues=None, weather_impact="Clear day, good progress.",
+                created_at=_now() - timedelta(hours=4),
+            ),
+        ])
+        request = MaterialRequest(
+            site_id=skyline.id, requested_by_id=engineer.id,
+            needed_for="Block A column casting", note="Required for today's pour.",
+        )
+        db.add(request)
+        db.flush()
+        db.add_all([
+            MaterialRequestItem(request_id=request.id, material_id=cement.id, quantity=40),
+            MaterialRequestItem(request_id=request.id, material_id=steel.id, quantity=2),
+        ])
+
         db.commit()
         print("Seed complete.\n")
+        print("Sites: Skyline Residency + Harbor Bridge (construction) · TechPark Wiring (electrical)")
         print("Demo accounts (password: %s):" % DEMO_PASSWORD)
         print("  Manager       : manager@constructai.dev")
         print("  Stock handler : stock@constructai.dev")
+        print("  Site engineer : engineer@constructai.dev")
         print("  Vendor        : vendor1@constructai.dev (UltraTech Supplies)")
         print("                  vendor2@constructai.dev (Coastal Aggregates)")
         print("                  vendor3@constructai.dev (RapidBuild Traders)")

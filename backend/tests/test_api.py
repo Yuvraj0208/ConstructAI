@@ -37,7 +37,7 @@ def test_stock_handler_cannot_create_material(client, seed_data):
     headers = login(client, "stock@test.dev")
     res = client.post(
         "/materials",
-        json={"name": "X", "unit": "u", "industry_id": seed_data["industry_id"]},
+        json={"name": "X", "unit": "u", "site_id": seed_data["site_id"]},
         headers=headers,
     )
     assert res.status_code == 403
@@ -57,7 +57,7 @@ def test_recording_consumption_reduces_stock(client, seed_data):
 
 def test_weather_advisory_lists_sensitive_materials(client, seed_data):
     headers = login(client, "manager@test.dev")
-    res = client.get("/weather", headers=headers)
+    res = client.get("/weather", params={"site_id": seed_data["site_id"]}, headers=headers)
     assert res.status_code == 200
     body = res.json()
     assert body["will_rain"] is True
@@ -68,7 +68,7 @@ def test_full_procurement_lifecycle(client, seed_data):
     manager = login(client, "manager@test.dev")
 
     # 1. Run the engine -> suggestions exist, with the rain buffer applied.
-    run = client.post("/procurement/run", headers=manager)
+    run = client.post("/procurement/run", params={"site_id": seed_data["site_id"]}, headers=manager)
     assert run.status_code == 200, run.text
     suggestions = run.json()["suggestions"]
     assert len(suggestions) >= 1
@@ -99,7 +99,7 @@ def test_full_procurement_lifecycle(client, seed_data):
 
 def test_vendor_cannot_approve_orders(client, seed_data):
     manager = login(client, "manager@test.dev")
-    run = client.post("/procurement/run", headers=manager)
+    run = client.post("/procurement/run", params={"site_id": seed_data["site_id"]}, headers=manager)
     po = run.json()["suggestions"][0]
     vendor = login(client, "vendor@test.dev")
     res = client.post(f"/procurement/orders/{po['id']}/approve", headers=vendor)
@@ -121,3 +121,81 @@ def test_expiry_endpoint_lists_expiring_batches(client, seed_data):
     items = res.json()
     # The seeded Cement has a batch expiring in ~4 days.
     assert any(i["material_name"] == "Cement" and i["expiry_status"] == "expiring" for i in items)
+
+
+def test_sites_listed_and_materials_scoped_by_site(client, seed_data):
+    headers = login(client, "manager@test.dev")
+
+    sites = client.get("/sites", headers=headers)
+    assert sites.status_code == 200
+    assert seed_data["site_id"] in [s["id"] for s in sites.json()]
+
+    mats = client.get("/materials", params={"site_id": seed_data["site_id"]}, headers=headers).json()
+    assert mats and all(m["site_id"] == seed_data["site_id"] for m in mats)
+
+    # A different (non-existent) site has no materials.
+    empty = client.get("/materials", params={"site_id": 99999}, headers=headers).json()
+    assert empty == []
+
+
+def test_engineer_posts_daily_update_manager_sees_it(client, seed_data):
+    eng = login(client, "engineer@test.dev")
+    res = client.post(
+        "/engineering/daily-updates",
+        json={"site_id": seed_data["site_id"], "progress_percent": 55, "summary": "Slab poured", "labor_count": 22},
+        headers=eng,
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["progress_percent"] == 55
+
+    mgr = login(client, "manager@test.dev")
+    updates = client.get("/engineering/daily-updates", params={"site_id": seed_data["site_id"]}, headers=mgr).json()
+    assert any(u["summary"] == "Slab poured" for u in updates)
+
+
+def test_material_request_issue_draws_stock_fifo(client, seed_data):
+    eng = login(client, "engineer@test.dev")
+    req = client.post(
+        "/engineering/material-requests",
+        json={"site_id": seed_data["site_id"], "needed_for": "slab",
+              "items": [{"material_id": seed_data["cement_id"], "quantity": 30}]},
+        headers=eng,
+    )
+    assert req.status_code == 201, req.text
+    assert req.json()["status"] == "pending"
+    request_id = req.json()["id"]
+
+    stock = login(client, "stock@test.dev")
+    before = next(
+        m for m in client.get("/materials", params={"site_id": seed_data["site_id"]}, headers=stock).json()
+        if m["id"] == seed_data["cement_id"]
+    )["current_stock"]
+
+    issue = client.post(f"/engineering/material-requests/{request_id}/issue", headers=stock)
+    assert issue.status_code == 200 and issue.json()["status"] == "issued"
+
+    after = next(
+        m for m in client.get("/materials", params={"site_id": seed_data["site_id"]}, headers=stock).json()
+        if m["id"] == seed_data["cement_id"]
+    )["current_stock"]
+    assert after == before - 30  # 80 -> 50
+
+
+def test_engineer_role_guards(client, seed_data):
+    # Manager cannot post a site-engineer daily update.
+    mgr = login(client, "manager@test.dev")
+    assert client.post(
+        "/engineering/daily-updates",
+        json={"site_id": seed_data["site_id"], "progress_percent": 10, "summary": "x"},
+        headers=mgr,
+    ).status_code == 403
+
+    # A vendor cannot issue a material request.
+    eng = login(client, "engineer@test.dev")
+    rid = client.post(
+        "/engineering/material-requests",
+        json={"site_id": seed_data["site_id"], "items": [{"material_id": seed_data["cement_id"], "quantity": 5}]},
+        headers=eng,
+    ).json()["id"]
+    vendor = login(client, "vendor@test.dev")
+    assert client.post(f"/engineering/material-requests/{rid}/issue", headers=vendor).status_code == 403

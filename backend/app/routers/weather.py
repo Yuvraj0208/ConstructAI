@@ -17,6 +17,7 @@ router = APIRouter(prefix="/weather", tags=["weather"])
 @router.get("", response_model=WeatherOut)
 def weather(
     city: str | None = None,
+    site_id: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> WeatherOut:
@@ -24,10 +25,10 @@ def weather(
     data = get_forecast(target_city)
 
     advisory: list[str] = []
-    if data.get("will_rain") and user.industry_id is not None:
+    if data.get("will_rain") and site_id is not None:
         sensitive = db.scalars(
             select(Material).where(
-                Material.industry_id == user.industry_id,
+                Material.site_id == site_id,
                 Material.weather_sensitive.is_(True),
             )
         ).all()

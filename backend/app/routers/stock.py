@@ -69,13 +69,19 @@ def record_movement(
 @router.get("/movements", response_model=list[MovementOut])
 def list_movements(
     material_id: int | None = None,
+    site_id: int | None = None,
     limit: int = 100,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[StockMovement]:
-    stmt = select(StockMovement).order_by(StockMovement.created_at.desc()).limit(min(limit, 500))
+    stmt = select(StockMovement)
+    if site_id is not None:
+        stmt = stmt.join(Material, StockMovement.material_id == Material.id).where(
+            Material.site_id == site_id
+        )
     if material_id is not None:
         stmt = stmt.where(StockMovement.material_id == material_id)
+    stmt = stmt.order_by(StockMovement.created_at.desc()).limit(min(limit, 500))
     return list(db.scalars(stmt).all())
 
 
@@ -157,21 +163,23 @@ def list_batches(
 
 @router.get("/expiry", response_model=list[StockBatchOut])
 def expiring_batches(
+    site_id: int | None = None,
     days: int = EXPIRY_SOON_DAYS,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    _: User = Depends(get_current_user),
 ) -> list[StockBatchOut]:
-    """Batches in your industry that are already expired or expiring within `days`."""
+    """Batches at a site that are already expired or expiring within `days`."""
     stmt = (
         select(StockBatch)
         .join(Material, StockBatch.material_id == Material.id)
         .where(
-            Material.industry_id == user.industry_id,
             StockBatch.remaining_quantity > 0,
             StockBatch.expiry_date.is_not(None),
         )
         .order_by(StockBatch.expiry_date.asc())
     )
+    if site_id is not None:
+        stmt = stmt.where(Material.site_id == site_id)
     cutoff = datetime.now(timezone.utc) + timedelta(days=days)
     result: list[StockBatchOut] = []
     for batch in db.scalars(stmt).all():

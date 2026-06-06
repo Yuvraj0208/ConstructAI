@@ -36,6 +36,7 @@ class Role(str, enum.Enum):
     STOCK_HANDLER = "stock_handler"
     MANAGER = "manager"
     VENDOR = "vendor"
+    SITE_ENGINEER = "site_engineer"
 
 
 class MovementType(str, enum.Enum):
@@ -54,6 +55,12 @@ class POStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class RequestStatus(str, enum.Enum):
+    PENDING = "pending"     # raised by a site engineer, awaiting the stock handler
+    ISSUED = "issued"       # stock handler released the materials (stock drawn down)
+    REJECTED = "rejected"   # stock handler declined
+
+
 def _enum_col(enum_cls):
     """Store enums by their string *value* (e.g. 'manager') for readability."""
     return SAEnum(enum_cls, values_callable=lambda e: [m.value for m in e], native_enum=False)
@@ -70,7 +77,7 @@ class Industry(Base):
     slug: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
-    materials: Mapped[list["Material"]] = relationship(back_populates="industry")
+    sites: Mapped[list["Site"]] = relationship(back_populates="industry")
     users: Mapped[list["User"]] = relationship(back_populates="industry")
 
 
@@ -93,9 +100,30 @@ class User(Base):
     vendor_profile: Mapped["Vendor | None"] = relationship(back_populates="user", uselist=False)
 
 
+class Site(Base):
+    """A physical project site/location. Each site runs its own stock & procurement,
+    so a company can operate many sites (of possibly different industries) in parallel."""
+
+    __tablename__ = "sites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(120), nullable=True)  # drives the weather module
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    industry_id: Mapped[int] = mapped_column(ForeignKey("industries.id"), nullable=False, index=True)
+    industry: Mapped["Industry"] = relationship(back_populates="sites")
+
+    materials: Mapped[list["Material"]] = relationship(
+        back_populates="site", cascade="all, delete-orphan"
+    )
+
+
 class Material(Base):
     __tablename__ = "materials"
-    __table_args__ = (UniqueConstraint("industry_id", "name", name="uq_material_per_industry"),)
+    __table_args__ = (UniqueConstraint("site_id", "name", name="uq_material_per_site"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -113,8 +141,8 @@ class Material(Base):
     reserve_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
-    industry_id: Mapped[int] = mapped_column(ForeignKey("industries.id"), nullable=False)
-    industry: Mapped["Industry"] = relationship(back_populates="materials")
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False, index=True)
+    site: Mapped["Site"] = relationship(back_populates="materials")
 
     movements: Mapped[list["StockMovement"]] = relationship(
         back_populates="material", cascade="all, delete-orphan"
@@ -267,3 +295,57 @@ class WeatherRecord(Base):
     temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_forecast: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class DailyUpdate(Base):
+    """A site engineer's daily progress report, visible to the manager."""
+
+    __tablename__ = "daily_updates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False, index=True)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    progress_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)  # 0..100
+    summary: Mapped[str] = mapped_column(Text, nullable=False)        # what was done today
+    labor_count: Mapped[int] = mapped_column(Integer, default=0)      # workers on site
+    issues: Mapped[str | None] = mapped_column(Text, nullable=True)   # blockers / open issues
+    weather_impact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, index=True)
+
+    site: Mapped["Site"] = relationship()
+    author: Mapped["User | None"] = relationship()
+
+
+class MaterialRequest(Base):
+    """Materials a site engineer asks the stock handler to issue for the day's work."""
+
+    __tablename__ = "material_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False, index=True)
+    requested_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    status: Mapped[RequestStatus] = mapped_column(
+        _enum_col(RequestStatus), default=RequestStatus.PENDING, index=True
+    )
+    needed_for: Mapped[str | None] = mapped_column(String(160), nullable=True)  # e.g. "Block B slab"
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, index=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+    site: Mapped["Site"] = relationship()
+    items: Mapped[list["MaterialRequestItem"]] = relationship(
+        back_populates="request", cascade="all, delete-orphan"
+    )
+
+
+class MaterialRequestItem(Base):
+    __tablename__ = "material_request_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("material_requests.id"), nullable=False, index=True)
+    material_id: Mapped[int] = mapped_column(ForeignKey("materials.id"), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+
+    request: Mapped["MaterialRequest"] = relationship(back_populates="items")
+    material: Mapped["Material"] = relationship()

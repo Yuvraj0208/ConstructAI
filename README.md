@@ -16,12 +16,16 @@ extend to electrical / plumbing / manufacturing without code changes.
 
 ---
 
-## Three roles
+## Four roles, multiple sites
+
+A company runs **multiple sites** (each belongs to an industry and owns its own
+stock/procurement). Every role gets a **site switcher** in the top bar.
 
 | Role | What they do |
 |------|--------------|
-| **Stock Handler** | Track material levels; log usage (out) and deliveries (in). |
-| **Manager** | Dashboards, set reorder thresholds, view weather, spot anomalies (e.g. a cement-usage spike → possible theft), run the engine, and approve/reject auto-orders. |
+| **Stock Handler** | Track material levels; log usage/deliveries; **issue** the engineer's material requests; receive purchase orders. |
+| **Manager** | Dashboards, thresholds, weather, anomaly detection, run the auto-procurement engine, approve/reject orders, and watch **site progress**. |
+| **Site Engineer** | Post **daily progress updates** (with blockers, labor, weather impact) and **request materials** for the day. |
 | **Vendor** | Post price + delivery ETA per material; the engine ranks every offer. |
 
 ## Tech stack
@@ -110,6 +114,7 @@ Open **http://localhost:5173**
 |------|-------|
 | Manager | `manager@constructai.dev` |
 | Stock Handler | `stock@constructai.dev` |
+| Site Engineer | `engineer@constructai.dev` |
 | Vendor | `vendor1@constructai.dev` (also vendor2 / vendor3) |
 
 The login screen has one-click buttons to fill these in.
@@ -157,6 +162,13 @@ guards, reserve fields, expiry alerts, and the full suggest→approve→accept�
       the engine work off *available* (current − reserved) stock
 - [x] **Alembic migrations** manage the schema (no more auto-create on startup)
 - [x] 21 automated tests covering the above
+
+**Multi-site + Site Engineer (done)**
+- [x] **Sites** are the operational unit — each owns its own stock/procurement; a
+      **site switcher** in the top bar scopes every screen
+- [x] New **Site Engineer** role: daily progress updates (→ manager's Site Progress
+      panel) and material requests (→ stock handler issues, drawing stock down FIFO)
+- [x] 25 automated tests; data migrations preserve existing rows
 
 **Milestone 3 — AI layer (next)**
 - [ ] Agents to interlink procurement with budgeting & scheduling; contextual RAG

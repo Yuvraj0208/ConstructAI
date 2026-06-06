@@ -1,6 +1,6 @@
 // Shared types mirroring the backend API schemas.
 
-export type Role = 'stock_handler' | 'manager' | 'vendor';
+export type Role = 'stock_handler' | 'manager' | 'vendor' | 'site_engineer';
 
 export interface User {
   id: number;
@@ -19,6 +19,15 @@ export interface Industry {
   slug: string;
 }
 
+export interface Site {
+  id: number;
+  name: string;
+  code?: string | null;
+  city?: string | null;
+  industry_id: number;
+  is_active: boolean;
+}
+
 export type MaterialStatus = 'ok' | 'low' | 'critical';
 
 export interface Material {
@@ -34,7 +43,7 @@ export interface Material {
   reserved_quantity: number;
   available_stock: number;
   below_reserve: boolean;
-  industry_id: number;
+  site_id: number;
   status: MaterialStatus;
   created_at: string;
 }
@@ -91,10 +100,51 @@ export const ROLE_LABELS: Record<Role, string> = {
   manager: 'Manager',
   stock_handler: 'Stock Handler',
   vendor: 'Vendor',
+  site_engineer: 'Site Engineer',
 };
 
 export function dashboardPath(role: Role): string {
-  return { manager: '/app/manager', stock_handler: '/app/stock', vendor: '/app/vendor' }[role];
+  return {
+    manager: '/app/manager',
+    stock_handler: '/app/stock',
+    vendor: '/app/vendor',
+    site_engineer: '/app/engineer',
+  }[role];
+}
+
+export type RequestStatus = 'pending' | 'issued' | 'rejected';
+
+export interface MaterialRequestItem {
+  material_id: number;
+  material_name?: string | null;
+  unit?: string | null;
+  quantity: number;
+}
+
+export interface MaterialRequest {
+  id: number;
+  site_id: number;
+  requested_by_id?: number | null;
+  requester_name?: string | null;
+  status: RequestStatus;
+  needed_for?: string | null;
+  note?: string | null;
+  created_at: string;
+  decided_at?: string | null;
+  items: MaterialRequestItem[];
+}
+
+export interface DailyUpdate {
+  id: number;
+  site_id: number;
+  author_id?: number | null;
+  author_name?: string | null;
+  progress_percent: number;
+  summary: string;
+  labor_count: number;
+  issues?: string | null;
+  weather_impact?: string | null;
+  created_at: string;
 }
 
 export type POStatus = 'suggested' | 'approved' | 'rejected' | 'ordered' | 'delivered' | 'cancelled';

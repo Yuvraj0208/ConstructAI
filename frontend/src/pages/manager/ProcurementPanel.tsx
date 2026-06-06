@@ -97,23 +97,33 @@ function OrdersTable({
   );
 }
 
-export function ProcurementPanel({ onChange }: { onChange?: () => void }) {
+export function ProcurementPanel({
+  siteId,
+  onChange,
+}: {
+  siteId?: number | null;
+  onChange?: () => void;
+}) {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   function load() {
-    api.get<PurchaseOrder[]>('/procurement/orders').then((r) => setOrders(r.data));
+    if (siteId == null) return;
+    api
+      .get<PurchaseOrder[]>('/procurement/orders', { params: { site_id: siteId } })
+      .then((r) => setOrders(r.data));
   }
-  useEffect(load, []);
+  useEffect(load, [siteId]);
 
   async function run() {
+    if (siteId == null) return;
     setRunning(true);
     setError('');
     setMessage('');
     try {
-      const r = await api.post('/procurement/run');
+      const r = await api.post('/procurement/run', null, { params: { site_id: siteId } });
       setMessage(r.data.message);
       load();
       onChange?.();

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, apiError } from '../../api/client';
-import { useAuth } from '../../auth/AuthContext';
+import { useSite } from '../../site/SiteContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
+import { MaterialRequestsQueue } from './MaterialRequestsQueue';
 import { Button, Card, ErrorText, fmtNum, inputClass, labelClass, Spinner, StatusBadge } from '../../components/ui';
 import type { Movement, MovementType, PurchaseOrder } from '../../types';
 
@@ -13,10 +14,8 @@ const MOVEMENT_OPTIONS: { value: MovementType; label: string; hint: string }[] =
 ];
 
 export default function StockDashboard() {
-  const { user } = useAuth();
-  const { industries, industryId, setIndustryId, materials, loading, reload } = useMaterials(
-    user?.industry_id ?? null,
-  );
+  const { selectedSiteId } = useSite();
+  const { materials, loading, reload } = useMaterials();
 
   const [materialId, setMaterialId] = useState<number | ''>('');
   const [movementType, setMovementType] = useState<MovementType>('consumption');
@@ -35,15 +34,20 @@ export default function StockDashboard() {
   }, [materials]);
 
   function loadMovements() {
-    api.get<Movement[]>('/stock/movements', { params: { limit: 15 } }).then((res) => setMovements(res.data));
+    if (selectedSiteId == null) return;
+    api
+      .get<Movement[]>('/stock/movements', { params: { site_id: selectedSiteId, limit: 15 } })
+      .then((res) => setMovements(res.data));
   }
-
-  useEffect(loadMovements, []);
+  useEffect(loadMovements, [selectedSiteId]);
 
   function loadIncoming() {
-    api.get<PurchaseOrder[]>('/procurement/orders').then((res) => setIncoming(res.data));
+    if (selectedSiteId == null) return;
+    api
+      .get<PurchaseOrder[]>('/procurement/orders', { params: { site_id: selectedSiteId } })
+      .then((res) => setIncoming(res.data));
   }
-  useEffect(loadIncoming, []);
+  useEffect(loadIncoming, [selectedSiteId]);
 
   async function receive(id: number) {
     await api.post(`/procurement/orders/${id}/receive`);
@@ -52,10 +56,13 @@ export default function StockDashboard() {
     loadIncoming();
   }
 
-  // Default the form's material to the first one once materials load.
+  // Keep the form's selected material valid for the current site.
   useEffect(() => {
-    if (materialId === '' && materials.length) setMaterialId(materials[0].id);
-  }, [materials, materialId]);
+    if (!materials.some((m) => m.id === materialId)) {
+      setMaterialId(materials[0]?.id ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materials]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -86,19 +93,6 @@ export default function StockDashboard() {
     <Layout
       title="Stock Control"
       subtitle="Track material levels and record usage or deliveries"
-      actions={
-        <select
-          className={`${inputClass} w-48`}
-          value={industryId ?? ''}
-          onChange={(e) => setIndustryId(Number(e.target.value))}
-        >
-          {industries.map((ind) => (
-            <option key={ind.id} value={ind.id}>
-              {ind.name}
-            </option>
-          ))}
-        </select>
-      }
     >
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Materials table */}
@@ -244,6 +238,15 @@ export default function StockDashboard() {
           </form>
         </Card>
       </div>
+
+      {/* Material requests from the site engineer (issue draws stock) */}
+      <MaterialRequestsQueue
+        siteId={selectedSiteId}
+        onIssued={() => {
+          reload();
+          loadMovements();
+        }}
+      />
 
       {/* Incoming deliveries to receive into stock */}
       <Card className="mt-6">

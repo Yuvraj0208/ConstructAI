@@ -75,7 +75,7 @@ export default function Signup() {
         <div>
           <label className={labelClass}>I am a…</label>
           <div className="grid grid-cols-3 gap-2">
-            {(['stock_handler', 'manager', 'vendor'] as Role[]).map((r) => (
+            {(['stock_handler', 'site_engineer', 'manager', 'vendor'] as Role[]).map((r) => (
               <button
                 type="button"
                 key={r}

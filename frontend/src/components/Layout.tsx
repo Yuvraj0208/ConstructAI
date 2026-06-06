@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useSite } from '../site/SiteContext';
 import { ROLE_LABELS } from '../types';
 
 export function Layout({
@@ -14,6 +15,7 @@ export function Layout({
   children: ReactNode;
 }) {
   const { user, logout } = useAuth();
+  const { sites, selectedSiteId, setSelectedSiteId } = useSite();
 
   return (
     <div className="min-h-screen">
@@ -29,6 +31,25 @@ export function Layout({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {sites.length > 0 && (
+              <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5">
+                <span className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Site
+                </span>
+                <select
+                  value={selectedSiteId ?? ''}
+                  onChange={(e) => setSelectedSiteId(Number(e.target.value))}
+                  className="max-w-[12rem] bg-transparent text-sm font-semibold text-slate-800 outline-none"
+                >
+                  {sites.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                      {s.city ? ` · ${s.city}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {user && (
               <span className="hidden text-sm text-slate-600 sm:block">{user.full_name}</span>
             )}

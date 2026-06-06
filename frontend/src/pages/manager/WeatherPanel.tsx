@@ -14,15 +14,18 @@ export function weatherEmoji(condition: string, rain: boolean): string {
   return '🌤️';
 }
 
-export function WeatherPanel({ city }: { city?: string | null }) {
+export function WeatherPanel({ city, siteId }: { city?: string | null; siteId?: number | null }) {
   const [weather, setWeather] = useState<Weather | null>(null);
 
   useEffect(() => {
+    const params: Record<string, string | number> = {};
+    if (city) params.city = city;
+    if (siteId != null) params.site_id = siteId;
     api
-      .get<Weather>('/weather', { params: city ? { city } : {} })
+      .get<Weather>('/weather', { params })
       .then((r) => setWeather(r.data))
       .catch(() => {});
-  }, [city]);
+  }, [city, siteId]);
 
   if (!weather) return null;
 

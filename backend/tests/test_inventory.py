@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
-from app.models import Industry, Material, StockBatch
+from app.models import Industry, Material, Site, StockBatch
 from app.services.inventory import consume_fifo, expiry_status, recompute_stock
 
 
@@ -45,9 +45,12 @@ def test_consume_fifo_draws_soonest_expiry_first(db_session):
     industry = Industry(name="I", slug="i")
     db_session.add(industry)
     db_session.flush()
+    site = Site(name="S", industry_id=industry.id)
+    db_session.add(site)
+    db_session.flush()
     material = Material(
         name="Cement", unit="bags", current_stock=0, threshold=10, target_stock=100,
-        shelf_life_days=30, industry_id=industry.id,
+        shelf_life_days=30, site_id=site.id,
     )
     db_session.add(material)
     db_session.flush()

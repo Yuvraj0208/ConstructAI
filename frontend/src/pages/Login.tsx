@@ -9,6 +9,7 @@ import { Button, ErrorText, inputClass, labelClass } from '../components/ui';
 const DEMO_ACCOUNTS: Record<Role, string> = {
   manager: 'manager@constructai.dev',
   stock_handler: 'stock@constructai.dev',
+  site_engineer: 'engineer@constructai.dev',
   vendor: 'vendor1@constructai.dev',
 };
 
@@ -86,7 +87,7 @@ export default function Login() {
       <div className="mt-5 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
         <p className="mb-2 font-semibold text-slate-700">Try a demo account (password: password123)</p>
         <div className="flex flex-wrap gap-2">
-          {(['manager', 'stock_handler', 'vendor'] as Role[]).map((r) => (
+          {(['manager', 'stock_handler', 'site_engineer', 'vendor'] as Role[]).map((r) => (
             <button
               key={r}
               type="button"

@@ -15,6 +15,7 @@ from ..models import (
     POStatus,
     PurchaseOrder,
     Role,
+    Site,
     StockMovement,
     User,
     Vendor,
@@ -46,14 +47,16 @@ def _po_to_out(po: PurchaseOrder) -> PurchaseOrderOut:
 
 @router.post("/run", response_model=RunResult)
 def run_engine(
+    site_id: int,
     db: Session = Depends(get_db),
-    user: User = Depends(require_role(Role.MANAGER)),
+    _: User = Depends(require_role(Role.MANAGER)),
 ) -> RunResult:
-    """Generate suggested purchase orders for every low/critical material."""
-    if user.industry_id is None:
-        raise HTTPException(status_code=400, detail="Your account has no industry set")
+    """Generate suggested purchase orders for every low/critical material at a site."""
+    site = db.get(Site, site_id)
+    if site is None:
+        raise HTTPException(status_code=404, detail="Site not found")
 
-    created, weather, advisory = generate_suggestions(db, user.industry_id, user.city)
+    created, weather, advisory = generate_suggestions(db, site)
     weather_out = WeatherOut(**weather, advisory=advisory)
     n_materials = len({po.material_id for po in created})
 
@@ -71,11 +74,12 @@ def run_engine(
 
 @router.get("/orders", response_model=list[PurchaseOrderOut])
 def list_orders(
+    site_id: int | None = None,
     status_filter: POStatus | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[PurchaseOrderOut]:
-    """Managers see all orders in their industry; stock handlers see approved
+    """Managers see all orders at the selected site; stock handlers see approved
     (incoming) ones to receive; vendors see orders directed to them."""
     if user.role == Role.VENDOR:
         vendor = db.scalar(select(Vendor).where(Vendor.user_id == user.id))
@@ -91,9 +95,10 @@ def list_orders(
         stmt = (
             select(PurchaseOrder)
             .join(Material, PurchaseOrder.material_id == Material.id)
-            .where(Material.industry_id == user.industry_id)
             .order_by(PurchaseOrder.created_at.desc())
         )
+        if site_id is not None:
+            stmt = stmt.where(Material.site_id == site_id)
         if user.role == Role.STOCK_HANDLER:
             stmt = stmt.where(PurchaseOrder.status.in_([POStatus.APPROVED, POStatus.ORDERED]))
 

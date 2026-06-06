@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Industry, Material, Role, StockBatch, User, Vendor, VendorOffer
+from app.models import Industry, Material, Role, Site, StockBatch, User, Vendor, VendorOffer
 from app.security import hash_password
 
 # A weather forecast stub so tests never hit the network (and are deterministic).
@@ -68,6 +68,10 @@ def seed_data(db_session):
     db_session.add(industry)
     db_session.flush()
 
+    site = Site(name="Test Site", code="TS", city="Testville", industry_id=industry.id)
+    db_session.add(site)
+    db_session.flush()
+
     def make_user(email, role, city=None):
         u = User(
             email=email,
@@ -83,6 +87,7 @@ def seed_data(db_session):
 
     manager = make_user("manager@test.dev", Role.MANAGER, city="Testville")
     make_user("stock@test.dev", Role.STOCK_HANDLER)
+    make_user("engineer@test.dev", Role.SITE_ENGINEER)
     vendor_user = make_user("vendor@test.dev", Role.VENDOR)
 
     vendor1 = Vendor(name="FastCheapCo", rating=4.0, user_id=vendor_user.id, industry_id=industry.id)
@@ -92,7 +97,7 @@ def seed_data(db_session):
 
     cement = Material(
         name="Cement", unit="bags", current_stock=80, threshold=100, target_stock=500,
-        weather_sensitive=True, shelf_life_days=90, reserve_percent=0, industry_id=industry.id,
+        weather_sensitive=True, shelf_life_days=90, reserve_percent=0, site_id=site.id,
     )
     db_session.add(cement)
     db_session.flush()
@@ -115,6 +120,7 @@ def seed_data(db_session):
 
     return {
         "industry_id": industry.id,
+        "site_id": site.id,
         "manager_id": manager.id,
         "vendor1_id": vendor1.id,
         "vendor2_id": vendor2.id,

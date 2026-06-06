@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { api, apiError } from '../../api/client';
-import { useAuth } from '../../auth/AuthContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
 import { Button, Card, ErrorText, fmtMoney, fmtNum, inputClass, labelClass } from '../../components/ui';
@@ -16,8 +15,7 @@ const PO_PILL: Record<POStatus, string> = {
 };
 
 export default function VendorDashboard() {
-  const { user } = useAuth();
-  const { materials } = useMaterials(user?.industry_id ?? null);
+  const { materials } = useMaterials();
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [materialId, setMaterialId] = useState<number | ''>('');
@@ -45,8 +43,11 @@ export default function VendorDashboard() {
   }
 
   useEffect(() => {
-    if (materialId === '' && materials.length) setMaterialId(materials[0].id);
-  }, [materials, materialId]);
+    if (!materials.some((m) => m.id === materialId)) {
+      setMaterialId(materials[0]?.id ?? '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materials]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

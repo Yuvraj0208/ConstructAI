@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from .models import MovementType, POStatus, Role
+from .models import MovementType, POStatus, RequestStatus, Role
 
 
 # --------------------------------------------------------------------------- #
@@ -57,6 +57,17 @@ class IndustryOut(BaseModel):
     slug: str
 
 
+class SiteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    code: str | None = None
+    city: str | None = None
+    industry_id: int
+    is_active: bool
+
+
 # --------------------------------------------------------------------------- #
 # Materials
 # --------------------------------------------------------------------------- #
@@ -68,7 +79,7 @@ class MaterialCreate(BaseModel):
     weather_sensitive: bool = False
     shelf_life_days: int | None = None
     reserve_percent: float = 0.0
-    industry_id: int
+    site_id: int
     initial_stock: float = 0.0
 
 
@@ -97,7 +108,7 @@ class MaterialOut(BaseModel):
     reserved_quantity: float
     available_stock: float
     below_reserve: bool
-    industry_id: int
+    site_id: int
     status: str
     created_at: datetime
 
@@ -228,3 +239,63 @@ class RunResult(BaseModel):
     message: str
     suggestions: list[PurchaseOrderOut] = []
     weather: WeatherOut | None = None
+
+
+# --------------------------------------------------------------------------- #
+# Site engineer: daily updates
+# --------------------------------------------------------------------------- #
+class DailyUpdateCreate(BaseModel):
+    site_id: int
+    progress_percent: float = Field(ge=0, le=100)
+    summary: str = Field(min_length=1)
+    labor_count: int = Field(default=0, ge=0)
+    issues: str | None = None
+    weather_impact: str | None = None
+
+
+class DailyUpdateOut(BaseModel):
+    id: int
+    site_id: int
+    author_id: int | None = None
+    author_name: str | None = None
+    progress_percent: float
+    summary: str
+    labor_count: int
+    issues: str | None = None
+    weather_impact: str | None = None
+    created_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Site engineer: material requests
+# --------------------------------------------------------------------------- #
+class MaterialRequestItemIn(BaseModel):
+    material_id: int
+    quantity: float = Field(gt=0)
+
+
+class MaterialRequestItemOut(BaseModel):
+    material_id: int
+    material_name: str | None = None
+    unit: str | None = None
+    quantity: float
+
+
+class MaterialRequestCreate(BaseModel):
+    site_id: int
+    needed_for: str | None = None
+    note: str | None = None
+    items: list[MaterialRequestItemIn] = Field(min_length=1)
+
+
+class MaterialRequestOut(BaseModel):
+    id: int
+    site_id: int
+    requested_by_id: int | None = None
+    requester_name: str | None = None
+    status: RequestStatus
+    needed_for: str | None = None
+    note: str | None = None
+    created_at: datetime
+    decided_at: datetime | None = None
+    items: list[MaterialRequestItemOut] = []

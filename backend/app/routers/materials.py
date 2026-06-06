@@ -16,13 +16,13 @@ router = APIRouter(prefix="/materials", tags=["materials"])
 
 @router.get("", response_model=list[MaterialOut])
 def list_materials(
-    industry_id: int | None = None,
+    site_id: int | None = None,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> list[Material]:
     stmt = select(Material).order_by(Material.name)
-    if industry_id is not None:
-        stmt = stmt.where(Material.industry_id == industry_id)
+    if site_id is not None:
+        stmt = stmt.where(Material.site_id == site_id)
     return list(db.scalars(stmt).all())
 
 
@@ -52,7 +52,7 @@ def create_material(
         weather_sensitive=payload.weather_sensitive,
         shelf_life_days=payload.shelf_life_days,
         reserve_percent=payload.reserve_percent,
-        industry_id=payload.industry_id,
+        site_id=payload.site_id,
         current_stock=0.0,
     )
     db.add(material)

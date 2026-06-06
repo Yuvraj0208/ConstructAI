@@ -49,6 +49,7 @@ def list_vendors(
 @router.get("/offers", response_model=list[OfferOut])
 def list_offers(
     material_id: int | None = None,
+    site_id: int | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[OfferOut]:
@@ -63,6 +64,10 @@ def list_offers(
     else:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not permitted")
 
+    if site_id is not None:
+        stmt = stmt.join(Material, VendorOffer.material_id == Material.id).where(
+            Material.site_id == site_id
+        )
     if material_id is not None:
         stmt = stmt.where(VendorOffer.material_id == material_id)
 

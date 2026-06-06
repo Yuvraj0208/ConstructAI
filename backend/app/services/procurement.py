@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Material, POStatus, PurchaseOrder, VendorOffer
+from ..models import Material, POStatus, PurchaseOrder, Site, VendorOffer
 from .weather import get_forecast
 
 RAIN_BUFFER_FACTOR = 1.20  # order 20% extra of weather-sensitive materials before rain
@@ -137,17 +137,17 @@ def plan_material(material: Material, offers: list[VendorOffer], rain_buffer: bo
     return plans
 
 
-def generate_suggestions(db: Session, industry_id: int, city: str | None) -> tuple[list[PurchaseOrder], dict, list[str]]:
-    """Run the engine for all low/critical materials in an industry.
+def generate_suggestions(db: Session, site: Site) -> tuple[list[PurchaseOrder], dict, list[str]]:
+    """Run the engine for all low/critical materials at a site.
 
     Returns (created purchase orders, weather forecast dict, advisory material names).
     Existing un-approved SUGGESTED orders for the affected materials are cleared first
     so re-running stays idempotent.
     """
-    weather = get_forecast(city) if city else get_forecast("Mumbai")
+    weather = get_forecast(site.city) if site.city else get_forecast("Mumbai")
     will_rain = bool(weather.get("will_rain"))
 
-    materials = list(db.scalars(select(Material).where(Material.industry_id == industry_id)).all())
+    materials = list(db.scalars(select(Material).where(Material.site_id == site.id)).all())
     low_materials = [m for m in materials if m.status in ("low", "critical")]
 
     material_ids = [m.id for m in low_materials]
