@@ -127,9 +127,17 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-21 tests: engine unit tests (urgency, scoring, allocation, rain buffer), inventory tests
+25 tests: engine unit tests (urgency, scoring, allocation, rain buffer), inventory tests
 (reserve/available, batch FIFO, expiry buckets), and API integration tests (auth, role
-guards, reserve fields, expiry alerts, and the full suggest→approve→accept→receive lifecycle).
+guards, site scoping, the suggest→approve→accept→receive lifecycle, and the site-engineer
+daily-update + material-request → issue flow).
+
+## Deploy (Vercel + Render)
+
+Frontend → **Vercel**, backend + Postgres → **Render**, both from this repo. It's
+pre-configured ([`render.yaml`](render.yaml), [`frontend/vercel.json`](frontend/vercel.json),
+keep-warm workflow) and **auto-seeds demo data on deploy**. Full step-by-step:
+**[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ---
 

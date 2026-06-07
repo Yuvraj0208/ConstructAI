@@ -267,20 +267,22 @@ def seed(reset: bool = False) -> None:
         )
 
         # --- Vendors (each also a login) --------------------------------- #
+        # vendor1 (UltraTech) is a cross-domain distributor: industry_id=None means
+        # it sees EVERY site and can quote on materials across all industries.
         vendor_specs = [
-            ("vendor1@constructai.dev", "Anil Sharma", "UltraTech Supplies", "Mumbai", 4.5),
-            ("vendor2@constructai.dev", "Meena Rao", "Coastal Aggregates", "Pune", 4.0),
-            ("vendor3@constructai.dev", "Sunil Gupta", "RapidBuild Traders", "Mumbai", 3.5),
+            ("vendor1@constructai.dev", "Anil Sharma", "UltraTech Supplies", "Mumbai", 4.5, None),
+            ("vendor2@constructai.dev", "Meena Rao", "Coastal Aggregates", "Pune", 4.0, construction.id),
+            ("vendor3@constructai.dev", "Sunil Gupta", "RapidBuild Traders", "Mumbai", 3.5, construction.id),
         ]
         vendors: dict[str, Vendor] = {}
-        for email, person, company, city, rating in vendor_specs:
+        for email, person, company, city, rating, vindustry in vendor_specs:
             vuser = _create_user(
                 db, email=email, full_name=person, role=Role.VENDOR,
-                city=city, industry_id=construction.id,
+                city=city, industry_id=vindustry,
             )
             vendor = Vendor(
                 name=company, city=city, rating=rating,
-                user_id=vuser.id, industry_id=construction.id,
+                user_id=vuser.id, industry_id=vindustry,
             )
             db.add(vendor)
             db.flush()
@@ -424,6 +426,7 @@ def seed(reset: bool = False) -> None:
                 ],
                 "update": (52, "Conduit laid on floors 1-3; pulling cables.", 18, "Awaiting breaker delivery."),
                 "request": [("Copper Wire", 200), ("Switches", 50)],
+                "global_offer": ("Copper Wire", 47, 2, 2000),
             },
             {
                 "industry": plumbing, "site": ("Grand Mall Plumbing", "GMP", "Delhi"),
@@ -442,6 +445,7 @@ def seed(reset: bool = False) -> None:
                 ],
                 "update": (38, "Riser pipes installed on tower B; pressure testing.", 14, None),
                 "request": [("PVC Pipe", 150), ("Fittings", 200)],
+                "global_offer": ("PVC Pipe", 62, 2, 2500),
             },
             {
                 "industry": hvac, "site": ("DataCenter Cooling", "DCC", "Hyderabad"),
@@ -460,6 +464,7 @@ def seed(reset: bool = False) -> None:
                 ],
                 "update": (47, "Ductwork on level 4 complete; mounting AHUs.", 16, "Compressor stock critical."),
                 "request": [("Refrigerant", 30), ("Thermostats", 20)],
+                "global_offer": ("Ducting", 255, 2, 1800),
             },
             {
                 "industry": painting, "site": ("Skyline Interiors", "SKI", "Mumbai"),
@@ -478,6 +483,7 @@ def seed(reset: bool = False) -> None:
                 ],
                 "update": (60, "Putty work done on floors 1-5; first coat underway.", 12, None),
                 "request": [("Paint", 80), ("Primer", 40)],
+                "global_offer": ("Paint", 355, 2, 1200),
             },
         ]
 
@@ -506,6 +512,14 @@ def seed(reset: bool = False) -> None:
                         vendor_id=vendor.id, material_id=mats[mname].id,
                         price_per_unit=price, eta_days=eta, available_quantity=qty,
                     ))
+
+            # The cross-domain distributor (UltraTech) also quotes one material here,
+            # so logging in as vendor1 shows offers spanning every industry.
+            gm, gp, ge, gq = d["global_offer"]
+            db.add(VendorOffer(
+                vendor_id=vendors["UltraTech Supplies"].id, material_id=mats[gm].id,
+                price_per_unit=gp, eta_days=ge, available_quantity=gq,
+            ))
 
             prog, summ, lab, iss = d["update"]
             db.add(DailyUpdate(
