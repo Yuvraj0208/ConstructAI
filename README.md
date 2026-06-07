@@ -1,5 +1,14 @@
 # ConstructAI — Material Procurement Platform
 
+### 🚀 Live demo: **https://construct-ai-eosin.vercel.app**
+
+Try it with any demo login below (password `password123`):
+**`manager@`** · **`stock@`** · **`engineer@`** · **`vendor1@constructai.dev`** — the login
+screen has one-click buttons too. *(The free backend may take ~30s to wake on the first
+request, then it's fast.)*
+
+---
+
 An AI-ready material procurement system. It tracks material stock (with per-batch
 expiry and safety-stock reserves), lets vendors post price + delivery ETA, and
 auto-reorders by balancing price against delivery speed when stock dips below
