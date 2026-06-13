@@ -3,7 +3,9 @@ import type { MaterialStatus } from '../types';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <div
+      className={`rounded-2xl border border-white/70 bg-white/85 shadow-soft ring-1 ring-slate-900/[0.04] backdrop-blur-sm ${className}`}
+    >
       {children}
     </div>
   );
@@ -12,7 +14,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 export function Spinner({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600 ${className}`}
+      className={`h-6 w-6 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 ${className}`}
     />
   );
 }
@@ -24,11 +26,11 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' }) {
   const base =
-    'inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0';
   const styles =
     variant === 'primary'
-      ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-      : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-100';
+      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-glow hover:-translate-y-0.5 hover:shadow-[0_22px_55px_-18px_rgba(99,70,229,0.65)] active:translate-y-0'
+      : 'border border-slate-200 bg-white/80 text-slate-700 shadow-sm hover:bg-white hover:-translate-y-0.5';
   return (
     <button className={`${base} ${styles} ${className}`} {...props}>
       {children}
@@ -37,16 +39,24 @@ export function Button({
 }
 
 const STATUS_STYLES: Record<MaterialStatus, string> = {
-  ok: 'bg-emerald-100 text-emerald-700',
-  low: 'bg-amber-100 text-amber-700',
-  critical: 'bg-rose-100 text-rose-700',
+  ok: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+  low: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+  critical: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+};
+const STATUS_DOT: Record<MaterialStatus, string> = {
+  ok: 'bg-emerald-500',
+  low: 'bg-amber-500',
+  critical: 'bg-rose-500',
 };
 
 export function StatusBadge({ status }: { status: MaterialStatus }) {
   return (
     <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[status]}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ring-1 ${STATUS_STYLES[status]}`}
     >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]} ${status === 'critical' ? 'animate-pulse' : ''}`}
+      />
       {status}
     </span>
   );
@@ -63,14 +73,14 @@ export function fmtMoney(n: number): string {
 
 // Shared form styles so inputs look consistent across pages.
 export const inputClass =
-  'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200';
+  'w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15';
 
 export const labelClass = 'mb-1 block text-sm font-medium text-slate-700';
 
 export function ErrorText({ children }: { children: ReactNode }) {
   if (!children) return null;
   return (
-    <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div className="rounded-xl border border-rose-200 bg-rose-50/80 px-3 py-2 text-sm text-rose-700">
       {children}
     </div>
   );

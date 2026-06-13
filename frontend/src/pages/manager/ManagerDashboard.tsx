@@ -50,15 +50,35 @@ function pickDefaultMaterial(materials: Material[]): number | null {
   return (critical ?? low ?? materials[0])?.id ?? null;
 }
 
-function Kpi({ label, value, tone = 'slate' }: { label: string; value: number; tone?: string }) {
-  const toneClass =
-    { rose: 'text-rose-600', amber: 'text-amber-600', indigo: 'text-indigo-600' }[tone] ??
-    'text-slate-900';
+const KPI_TONES: Record<string, { grad: string; ring: string; text: string; chip: string }> = {
+  slate: { grad: 'from-slate-50', ring: 'ring-slate-200/70', text: 'text-slate-900', chip: 'bg-slate-100 text-slate-500' },
+  indigo: { grad: 'from-indigo-50', ring: 'ring-indigo-100', text: 'text-indigo-600', chip: 'bg-indigo-100 text-indigo-600' },
+  amber: { grad: 'from-amber-50', ring: 'ring-amber-100', text: 'text-amber-600', chip: 'bg-amber-100 text-amber-600' },
+  rose: { grad: 'from-rose-50', ring: 'ring-rose-100', text: 'text-rose-600', chip: 'bg-rose-100 text-rose-600' },
+};
+
+function Kpi({
+  label,
+  value,
+  tone = 'slate',
+  icon,
+}: {
+  label: string;
+  value: number;
+  tone?: string;
+  icon?: string;
+}) {
+  const t = KPI_TONES[tone] ?? KPI_TONES.slate;
   return (
-    <Card className="p-4">
-      <div className="text-xs font-medium tracking-wide text-slate-500 uppercase">{label}</div>
-      <div className={`mt-1 text-3xl font-bold ${toneClass}`}>{value}</div>
-    </Card>
+    <div
+      className={`rounded-2xl border border-white/70 bg-gradient-to-br ${t.grad} to-white p-4 shadow-soft ring-1 ${t.ring} transition hover:-translate-y-0.5`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</div>
+        {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg text-sm ${t.chip}`}>{icon}</span>}
+      </div>
+      <div className={`mt-2 text-3xl font-extrabold ${t.text}`}>{value}</div>
+    </div>
   );
 }
 
@@ -113,10 +133,10 @@ export default function ManagerDashboard() {
     >
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Kpi label="Materials" value={counts.total} />
-        <Kpi label="Low stock" value={counts.low} tone="amber" />
-        <Kpi label="Critical" value={counts.critical} tone="rose" />
-        <Kpi label="Active offers" value={offers.length} tone="indigo" />
+        <Kpi label="Materials" value={counts.total} icon="📦" />
+        <Kpi label="Low stock" value={counts.low} tone="amber" icon="⚠️" />
+        <Kpi label="Critical" value={counts.critical} tone="rose" icon="🚨" />
+        <Kpi label="Active offers" value={offers.length} tone="indigo" icon="🏷️" />
       </div>
 
       {/* Weather + site progress */}
