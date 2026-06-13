@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ConstructionBackdrop } from './ConstructionBackdrop';
+import { Icon } from './icons';
 
 const FEATURES = [
   'Auto-reorders the moment stock dips below threshold',
@@ -11,10 +12,8 @@ const FEATURES = [
 function Brand({ light = false }: { light?: boolean }) {
   return (
     <Link to="/" className="flex items-center gap-2.5">
-      <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 shadow-glow">
-        <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 21h18M6 21V8l6-4 6 4v13M10 12h.01M14 12h.01M10 16h.01M14 16h.01" />
-        </svg>
+      <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 via-violet-600 to-fuchsia-600 text-white shadow-glow">
+        <Icon name="building" className="h-5 w-5" />
       </div>
       <span className={`text-xl font-extrabold tracking-tight ${light ? 'text-white' : 'text-slate-900'}`}>
         Construct<span className={light ? 'text-amber-gradient' : 'text-gradient'}>AI</span>
@@ -52,7 +51,7 @@ export function AuthShell({
               {FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-3 text-sm text-slate-200">
                   <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-amber-400/20 text-amber-300">
-                    ✓
+                    <Icon name="check" className="h-3 w-3" />
                   </span>
                   {f}
                 </li>

@@ -4,6 +4,7 @@ import { useSite } from '../../site/SiteContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
 import { Button, Card, ErrorText, fmtNum, inputClass, labelClass, StatusBadge } from '../../components/ui';
+import { Icon } from '../../components/icons';
 import type { DailyUpdate, MaterialRequest, RequestStatus } from '../../types';
 
 const REQ_PILL: Record<RequestStatus, string> = {
@@ -232,9 +233,10 @@ export default function SiteEngineerDashboard() {
                     <button
                       type="button"
                       onClick={() => setLines((l) => l.filter((_, idx) => idx !== i))}
-                      className="px-1 text-slate-400 hover:text-rose-500"
+                      className="shrink-0 px-1 text-slate-400 hover:text-rose-500"
+                      aria-label="Remove material"
                     >
-                      ✕
+                      <Icon name="x" className="h-4 w-4" />
                     </button>
                   )}
                 </div>
@@ -330,7 +332,12 @@ export default function SiteEngineerDashboard() {
                   </span>
                 </div>
                 <div className="mt-1 text-slate-700">{u.summary}</div>
-                {u.issues && <div className="mt-1 text-xs text-rose-600">⚠ {u.issues}</div>}
+                {u.issues && (
+                  <div className="mt-1 flex items-center gap-1 text-xs text-rose-600">
+                    <Icon name="alert" className="h-3.5 w-3.5 shrink-0" />
+                    {u.issues}
+                  </div>
+                )}
               </div>
             ))}
             {updates.length === 0 && (

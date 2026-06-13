@@ -29,16 +29,16 @@ h3 {
   letter-spacing: -0.02em;
 }
 
-/* ---- Light app shell: faint blueprint grid + soft aurora glow ---- */
+/* ---- Light app shell: a fixed, faint blueprint grid. The role-aware
+   RoleBackdrop layers the coloured glow + motif on top of this. ---- */
 .app-shell {
   position: relative;
-  background-color: #f5f6fb;
+  background-color: #f6f7fb;
   background-image:
-    radial-gradient(900px 500px at 8% -8%, rgba(79, 70, 229, 0.10), transparent 60%),
-    radial-gradient(820px 460px at 112% -4%, rgba(124, 58, 237, 0.08), transparent 58%),
-    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px;
+    linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  background-attachment: fixed;
 }
 
 /* ---- Dark blueprint backdrop for hero / auth ---- */
@@ -142,4 +142,15 @@ h3 {
 }
 ::selection {
   background: rgba(124, 58, 237, 0.25);
+}
+
+/* ---- Respect users who prefer less motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

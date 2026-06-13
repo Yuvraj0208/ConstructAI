@@ -15,6 +15,7 @@ import { useSite } from '../../site/SiteContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
 import { Card, fmtMoney, fmtNum, Spinner, StatusBadge } from '../../components/ui';
+import { Icon, type IconName } from '../../components/icons';
 import { WeatherPanel } from './WeatherPanel';
 import { ProcurementPanel } from './ProcurementPanel';
 import { ExpiryPanel } from './ExpiryPanel';
@@ -66,16 +67,20 @@ function Kpi({
   label: string;
   value: number;
   tone?: string;
-  icon?: string;
+  icon?: IconName;
 }) {
   const t = KPI_TONES[tone] ?? KPI_TONES.slate;
   return (
     <div
-      className={`rounded-2xl border border-white/70 bg-gradient-to-br ${t.grad} to-white p-4 shadow-soft ring-1 ${t.ring} transition hover:-translate-y-0.5`}
+      className={`group rounded-2xl border border-white/70 bg-gradient-to-br ${t.grad} to-white p-4 shadow-soft ring-1 ${t.ring} transition hover:-translate-y-0.5`}
     >
       <div className="flex items-center justify-between">
         <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</div>
-        {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg text-sm ${t.chip}`}>{icon}</span>}
+        {icon && (
+          <span className={`grid h-7 w-7 place-items-center rounded-lg ${t.chip} transition group-hover:scale-110`}>
+            <Icon name={icon} className="h-4 w-4" />
+          </span>
+        )}
       </div>
       <div className={`mt-2 text-3xl font-extrabold ${t.text}`}>{value}</div>
     </div>
@@ -133,10 +138,10 @@ export default function ManagerDashboard() {
     >
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Kpi label="Materials" value={counts.total} icon="📦" />
-        <Kpi label="Low stock" value={counts.low} tone="amber" icon="⚠️" />
-        <Kpi label="Critical" value={counts.critical} tone="rose" icon="🚨" />
-        <Kpi label="Active offers" value={offers.length} tone="indigo" icon="🏷️" />
+        <Kpi label="Materials" value={counts.total} icon="box" />
+        <Kpi label="Low stock" value={counts.low} tone="amber" icon="alert" />
+        <Kpi label="Critical" value={counts.critical} tone="rose" icon="critical" />
+        <Kpi label="Active offers" value={offers.length} tone="indigo" icon="tag" />
       </div>
 
       {/* Weather + site progress */}
@@ -211,7 +216,7 @@ export default function ManagerDashboard() {
                       <div className="mt-1 text-[11px] text-slate-400">
                         {fmtNum(m.current_stock)} on hand · {fmtNum(m.reserved_quantity)} {m.unit} reserved
                         {m.below_reserve && (
-                          <span className="font-semibold text-rose-500"> · ⚠ into reserve</span>
+                          <span className="font-semibold text-rose-500"> · into reserve</span>
                         )}
                       </div>
                     )}
@@ -232,11 +237,14 @@ export default function ManagerDashboard() {
           </div>
 
           {analysis.anomalies.length > 0 && (
-            <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-              ⚠️ Unusual consumption detected on{' '}
-              <strong>{analysis.anomalies.map((a) => a.date.slice(5)).join(', ')}</strong> — well above
-              the {fmtNum(analysis.mean)}-{selectedMat?.unit ?? 'unit'} daily norm. Worth checking for
-              waste or theft.
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              <Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                Unusual consumption detected on{' '}
+                <strong>{analysis.anomalies.map((a) => a.date.slice(5)).join(', ')}</strong> — well
+                above the {fmtNum(analysis.mean)}-{selectedMat?.unit ?? 'unit'} daily norm. Worth
+                checking for waste or theft.
+              </span>
             </div>
           )}
 
