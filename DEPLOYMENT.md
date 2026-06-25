@@ -42,6 +42,15 @@ intervals is even more reliable.)
 > **Truly zero delay** needs an always-on instance — upgrade the Render service to the
 > Starter plan (~$7/mo) and it never sleeps. The Vercel frontend is always instant.
 
+## 4. AI features (optional — live Claude)
+
+The manager dashboard's **Ask ConstructAI** and **Budget & Forecast** run on a built-in
+rule-based engine by default, so the demo works with zero setup and zero cost. To switch
+them to live Claude, add your Anthropic API key on the Render service: **Environment → Add
+Environment Variable** → `ANTHROPIC_API_KEY` = your key (from
+https://console.anthropic.com), then redeploy. Leave it unset to keep the free demo
+running. The dashboard shows a **"Live AI" / "Demo"** badge for the active mode.
+
 ## Demo data
 
 The deploy seeds demo data automatically: **5 industries, 6 sites, every role**. Logins

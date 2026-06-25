@@ -183,3 +183,51 @@ export interface Weather {
   days: WeatherDay[];
   advisory: string[];
 }
+
+// --- AI layer ---
+export interface AiStatus {
+  enabled: boolean; // true = live Claude, false = rule-based demo fallback
+  model: string;
+}
+
+export interface Budget {
+  id: number;
+  site_id: number;
+  total_amount: number;
+  materials_amount: number;
+  labour_amount: number;
+  contingency_amount: number;
+  labor_rate: number;
+  source: 'ai' | 'manual';
+  rationale?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpendBreakdown {
+  materials: number;
+  labour: number;
+  total: number;
+}
+
+export interface BudgetForecast {
+  budget: Budget;
+  spend: SpendBreakdown;
+  committed: number;
+  utilization_percent: number;
+  projected_total: number;
+  on_track: boolean;
+  insight: string;
+  used_ai: boolean;
+}
+
+export interface AskSource {
+  label: string;
+  detail?: string | null;
+}
+
+export interface AskResponse {
+  answer: string;
+  sources: AskSource[];
+  used_ai: boolean;
+}

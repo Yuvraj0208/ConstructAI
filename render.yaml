@@ -26,3 +26,8 @@ services:
       # Allow the Vercel frontend (production + preview URLs) to call the API.
       - key: CORS_ORIGIN_REGEX
         value: "https://.*\\.vercel\\.app"
+      # Optional — set this in the Render dashboard to switch the AI features from
+      # the rule-based demo fallback to live Claude. Leave unset to keep the free
+      # demo working at no cost.
+      - key: ANTHROPIC_API_KEY
+        sync: false

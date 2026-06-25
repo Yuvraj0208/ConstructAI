@@ -20,6 +20,8 @@ import { WeatherPanel } from './WeatherPanel';
 import { ProcurementPanel } from './ProcurementPanel';
 import { ExpiryPanel } from './ExpiryPanel';
 import { SiteProgressPanel } from './SiteProgressPanel';
+import { AskAiPanel } from './AskAiPanel';
+import { BudgetPanel } from './BudgetPanel';
 import type { DailyUsage, Material, Offer } from '../../types';
 
 const STATUS_BAR: Record<string, string> = {
@@ -142,6 +144,12 @@ export default function ManagerDashboard() {
         <Kpi label="Low stock" value={counts.low} tone="amber" icon="alert" />
         <Kpi label="Critical" value={counts.critical} tone="rose" icon="critical" />
         <Kpi label="Active offers" value={offers.length} tone="indigo" icon="tag" />
+      </div>
+
+      {/* AI: natural-language insights + AI-proposed budget */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <AskAiPanel siteId={selectedSiteId} />
+        <BudgetPanel siteId={selectedSiteId} />
       </div>
 
       {/* Weather + site progress */}

@@ -299,3 +299,68 @@ class MaterialRequestOut(BaseModel):
     created_at: datetime
     decided_at: datetime | None = None
     items: list[MaterialRequestItemOut] = []
+
+
+# --------------------------------------------------------------------------- #
+# AI layer: status, budgeting, natural-language insights
+# --------------------------------------------------------------------------- #
+class AiStatusOut(BaseModel):
+    enabled: bool  # True when a real Claude key is configured
+    model: str
+
+
+class BudgetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    site_id: int
+    total_amount: float
+    materials_amount: float
+    labour_amount: float
+    contingency_amount: float
+    labor_rate: float
+    source: str  # ai | manual
+    rationale: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class BudgetUpdate(BaseModel):
+    total_amount: float | None = Field(default=None, ge=0)
+    materials_amount: float | None = Field(default=None, ge=0)
+    labour_amount: float | None = Field(default=None, ge=0)
+    contingency_amount: float | None = Field(default=None, ge=0)
+    labor_rate: float | None = Field(default=None, ge=0)
+
+
+class SpendBreakdown(BaseModel):
+    materials: float
+    labour: float
+    total: float
+
+
+class BudgetForecastOut(BaseModel):
+    budget: BudgetOut
+    spend: SpendBreakdown          # ₹ already delivered/consumed
+    committed: float               # approved/ordered POs not yet delivered
+    utilization_percent: float     # (spend + committed) / total budget
+    projected_total: float         # extrapolated final spend
+    on_track: bool
+    insight: str
+    used_ai: bool
+
+
+class AskRequest(BaseModel):
+    site_id: int
+    question: str = Field(min_length=1, max_length=500)
+
+
+class AskSource(BaseModel):
+    label: str
+    detail: str | None = None
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: list[AskSource] = []
+    used_ai: bool

@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 1 day
 
+    # AI layer (optional). When ANTHROPIC_API_KEY is unset, the AI endpoints fall
+    # back to a deterministic rule-based engine so the live demo keeps working.
+    anthropic_api_key: str | None = None
+    ai_model: str = "claude-opus-4-8"
+    # Default labour cost per worker-day (₹) used for budget & spend estimates.
+    labor_rate_per_worker_day: float = 1200.0
+
     # Database (SQLite by default for zero-setup local dev)
     database_url: str = "sqlite:///./constructai.db"
 

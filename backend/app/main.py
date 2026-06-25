@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .routers import (
+    ai,
     auth,
     engineering,
     industries,
@@ -52,6 +53,7 @@ app.include_router(vendors.router)
 app.include_router(procurement.router)
 app.include_router(weather.router)
 app.include_router(engineering.router)
+app.include_router(ai.router)
 
 
 @app.get("/", tags=["health"])

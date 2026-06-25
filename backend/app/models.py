@@ -349,3 +349,30 @@ class MaterialRequestItem(Base):
 
     request: Mapped["MaterialRequest"] = relationship(back_populates="items")
     material: Mapped["Material"] = relationship()
+
+
+class Budget(Base):
+    """A site's project budget. The AI proposes it (materials + labour +
+    contingency, connecting weather/procurement/labour); the manager can adjust.
+    Actual spend is derived from purchase orders + labour, never stored here."""
+
+    __tablename__ = "budgets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(
+        ForeignKey("sites.id"), unique=True, nullable=False, index=True
+    )
+    total_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    materials_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    labour_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    contingency_amount: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    # Labour cost per worker-day used to turn daily-update headcounts into ₹.
+    labor_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    source: Mapped[str] = mapped_column(String(20), default="ai", nullable=False)  # ai | manual
+    rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+    site: Mapped["Site"] = relationship()
