@@ -10,5 +10,6 @@ from __future__ import annotations
 from .agent import ask
 from .budget import build_forecast, propose_budget
 from .client import ai_enabled
+from .vision import analyze_site_image
 
-__all__ = ["ask", "propose_budget", "build_forecast", "ai_enabled"]
+__all__ = ["ask", "propose_budget", "build_forecast", "ai_enabled", "analyze_site_image"]

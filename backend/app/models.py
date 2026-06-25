@@ -376,3 +376,30 @@ class Budget(Base):
     )
 
     site: Mapped["Site"] = relationship()
+
+
+class SiteImageReport(Base):
+    """An AI vision analysis of a site progress photo a site engineer uploads.
+    The image is stored base64 in Postgres (Render's disk is ephemeral). The
+    list fields are stored as JSON text."""
+
+    __tablename__ = "site_image_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False, index=True)
+    author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    media_type: Mapped[str] = mapped_column(String(60), default="image/jpeg", nullable=False)
+    image_b64: Mapped[str] = mapped_column(Text, nullable=False)
+    caption: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # AI vision output:
+    progress_estimate: Mapped[float | None] = mapped_column(Float, nullable=True)  # 0..100
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    observations: Mapped[str] = mapped_column(Text, nullable=False, default="[]")      # JSON list
+    safety_flags: Mapped[str] = mapped_column(Text, nullable=False, default="[]")      # JSON list
+    materials_visible: Mapped[str] = mapped_column(Text, nullable=False, default="[]")  # JSON list
+    status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    used_ai: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, index=True)
+
+    site: Mapped["Site"] = relationship()
+    author: Mapped["User | None"] = relationship()

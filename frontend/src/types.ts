@@ -231,3 +231,26 @@ export interface AskResponse {
   sources: AskSource[];
   used_ai: boolean;
 }
+
+export type ImageReportStatus = 'on_track' | 'needs_attention' | 'blocked' | 'pending';
+
+export interface SiteImageReport {
+  id: number;
+  site_id: number;
+  author_id?: number | null;
+  author_name?: string | null;
+  caption?: string | null;
+  media_type: string;
+  progress_estimate?: number | null;
+  summary: string;
+  observations: string[];
+  safety_flags: string[];
+  materials_visible: string[];
+  status: ImageReportStatus | string;
+  used_ai: boolean;
+  created_at: string;
+}
+
+export interface SiteImageReportDetail extends SiteImageReport {
+  image_data_url: string;
+}

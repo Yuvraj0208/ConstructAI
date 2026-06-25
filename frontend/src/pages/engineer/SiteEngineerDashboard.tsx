@@ -5,6 +5,7 @@ import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
 import { Button, Card, ErrorText, fmtNum, inputClass, labelClass, StatusBadge } from '../../components/ui';
 import { Icon } from '../../components/icons';
+import { SitePhotosPanel } from '../../components/SitePhotosPanel';
 import type { DailyUpdate, MaterialRequest, RequestStatus } from '../../types';
 
 const REQ_PILL: Record<RequestStatus, string> = {
@@ -345,6 +346,11 @@ export default function SiteEngineerDashboard() {
             )}
           </div>
         </Card>
+      </div>
+
+      {/* Site photo upload → AI vision report (sent to the manager) */}
+      <div className="mt-6">
+        <SitePhotosPanel siteId={selectedSiteId} canUpload />
       </div>
     </Layout>
   );

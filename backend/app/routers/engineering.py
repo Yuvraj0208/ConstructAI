@@ -2,9 +2,11 @@
 (which the stock handler issues, drawing down stock)."""
 from __future__ import annotations
 
+import base64
+import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +20,7 @@ from ..models import (
     MovementType,
     RequestStatus,
     Role,
+    SiteImageReport,
     StockMovement,
     User,
 )
@@ -27,7 +30,10 @@ from ..schemas import (
     MaterialRequestCreate,
     MaterialRequestItemOut,
     MaterialRequestOut,
+    SiteImageReportDetail,
+    SiteImageReportOut,
 )
+from ..services.ai.vision import analyze_site_image
 from ..services.inventory import consume_fifo, recompute_stock
 
 router = APIRouter(prefix="/engineering", tags=["engineering"])
@@ -222,3 +228,119 @@ def reject_material_request(
     db.refresh(req)
     requester = db.get(User, req.requested_by_id) if req.requested_by_id else None
     return _request_to_out(req, requester.full_name if requester else None)
+
+
+# --------------------------------------------------------------------------- #
+# Site photos — AI vision progress reports
+# --------------------------------------------------------------------------- #
+MAX_IMAGE_BYTES = 6 * 1024 * 1024  # 6 MB (stored base64 in Postgres)
+
+
+def _photo_to_out(r: SiteImageReport, author_name: str | None) -> SiteImageReportOut:
+    return SiteImageReportOut(
+        id=r.id,
+        site_id=r.site_id,
+        author_id=r.author_id,
+        author_name=author_name,
+        caption=r.caption,
+        media_type=r.media_type,
+        progress_estimate=r.progress_estimate,
+        summary=r.summary,
+        observations=json.loads(r.observations or "[]"),
+        safety_flags=json.loads(r.safety_flags or "[]"),
+        materials_visible=json.loads(r.materials_visible or "[]"),
+        status=r.status,
+        used_ai=r.used_ai,
+        created_at=r.created_at,
+    )
+
+
+def _photo_to_detail(r: SiteImageReport, author_name: str | None) -> SiteImageReportDetail:
+    base = _photo_to_out(r, author_name)
+    return SiteImageReportDetail(
+        **base.model_dump(),
+        image_data_url=f"data:{r.media_type};base64,{r.image_b64}",
+    )
+
+
+@router.post(
+    "/site-photos", response_model=SiteImageReportDetail, status_code=status.HTTP_201_CREATED
+)
+def upload_site_photo(
+    site_id: int = Form(...),
+    caption: str | None = Form(None),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(Role.SITE_ENGINEER)),
+) -> SiteImageReportDetail:
+    """Engineer uploads a progress photo; an AI vision report is generated + stored."""
+    media_type = file.content_type or "image/jpeg"
+    if not media_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Please upload an image file.")
+    data = file.file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty.")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image too large (max 6 MB).")
+
+    report = analyze_site_image(data, media_type)
+    row = SiteImageReport(
+        site_id=site_id,
+        author_id=user.id,
+        media_type=media_type,
+        image_b64=base64.standard_b64encode(data).decode("ascii"),
+        caption=caption,
+        progress_estimate=report["progress_estimate"],
+        summary=report["summary"],
+        observations=json.dumps(report["observations"]),
+        safety_flags=json.dumps(report["safety_flags"]),
+        materials_visible=json.dumps(report["materials_visible"]),
+        status=report["status"],
+        used_ai=report["used_ai"],
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _photo_to_detail(row, user.full_name)
+
+
+@router.get("/site-photos", response_model=list[SiteImageReportOut])
+def list_site_photos(
+    site_id: int,
+    limit: int = 12,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[SiteImageReportOut]:
+    """Photo reports for a site (metadata only — images are fetched on demand)."""
+    rows = list(
+        db.scalars(
+            select(SiteImageReport)
+            .where(SiteImageReport.site_id == site_id)
+            .order_by(SiteImageReport.created_at.desc())
+            .limit(min(limit, 50))
+        ).all()
+    )
+    author_ids = {r.author_id for r in rows if r.author_id}
+    names = (
+        {
+            u.id: u.full_name
+            for u in db.scalars(select(User).where(User.id.in_(author_ids))).all()
+        }
+        if author_ids
+        else {}
+    )
+    return [_photo_to_out(r, names.get(r.author_id)) for r in rows]
+
+
+@router.get("/site-photos/{report_id}", response_model=SiteImageReportDetail)
+def get_site_photo(
+    report_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> SiteImageReportDetail:
+    """A single report including the image (data URL) for inline display."""
+    r = db.get(SiteImageReport, report_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+    author = db.get(User, r.author_id) if r.author_id else None
+    return _photo_to_detail(r, author.full_name if author else None)

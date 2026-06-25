@@ -364,3 +364,27 @@ class AskResponse(BaseModel):
     answer: str
     sources: list[AskSource] = []
     used_ai: bool
+
+
+# --------------------------------------------------------------------------- #
+# AI layer: site-photo vision reports
+# --------------------------------------------------------------------------- #
+class SiteImageReportOut(BaseModel):
+    id: int
+    site_id: int
+    author_id: int | None = None
+    author_name: str | None = None
+    caption: str | None = None
+    media_type: str
+    progress_estimate: float | None = None
+    summary: str
+    observations: list[str] = []
+    safety_flags: list[str] = []
+    materials_visible: list[str] = []
+    status: str  # on_track | needs_attention | blocked | pending
+    used_ai: bool
+    created_at: datetime
+
+
+class SiteImageReportDetail(SiteImageReportOut):
+    image_data_url: str  # data:<mediatype>;base64,<...> for inline display

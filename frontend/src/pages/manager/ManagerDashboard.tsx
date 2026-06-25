@@ -22,6 +22,7 @@ import { ExpiryPanel } from './ExpiryPanel';
 import { SiteProgressPanel } from './SiteProgressPanel';
 import { AskAiPanel } from './AskAiPanel';
 import { BudgetPanel } from './BudgetPanel';
+import { SitePhotosPanel } from '../../components/SitePhotosPanel';
 import type { DailyUsage, Material, Offer } from '../../types';
 
 const STATUS_BAR: Record<string, string> = {
@@ -156,6 +157,11 @@ export default function ManagerDashboard() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <WeatherPanel city={selectedSite?.city} siteId={selectedSiteId} />
         <SiteProgressPanel siteId={selectedSiteId} />
+      </div>
+
+      {/* Site-photo AI vision reports from the field */}
+      <div className="mt-6">
+        <SitePhotosPanel siteId={selectedSiteId} />
       </div>
 
       {/* Expiry alerts (only renders when something is expiring/expired) */}
