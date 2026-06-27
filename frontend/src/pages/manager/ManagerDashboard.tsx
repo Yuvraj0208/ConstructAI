@@ -22,7 +22,9 @@ import { ExpiryPanel } from './ExpiryPanel';
 import { SiteProgressPanel } from './SiteProgressPanel';
 import { AskAiPanel } from './AskAiPanel';
 import { BudgetPanel } from './BudgetPanel';
+import { NotesSearchPanel } from './NotesSearchPanel';
 import { SitePhotosPanel } from '../../components/SitePhotosPanel';
+import { SchedulePanel } from '../../components/SchedulePanel';
 import type { DailyUsage, Material, Offer } from '../../types';
 
 const STATUS_BAR: Record<string, string> = {
@@ -151,6 +153,12 @@ export default function ManagerDashboard() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <AskAiPanel siteId={selectedSiteId} />
         <BudgetPanel siteId={selectedSiteId} />
+      </div>
+
+      {/* Schedule milestones + site-log search */}
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <SchedulePanel siteId={selectedSiteId} canManage />
+        <NotesSearchPanel siteId={selectedSiteId} />
       </div>
 
       {/* Weather + site progress */}

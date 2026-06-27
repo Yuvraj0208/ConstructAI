@@ -6,6 +6,7 @@ import { Layout } from '../../components/Layout';
 import { Button, Card, ErrorText, fmtNum, inputClass, labelClass, StatusBadge } from '../../components/ui';
 import { Icon } from '../../components/icons';
 import { SitePhotosPanel } from '../../components/SitePhotosPanel';
+import { SchedulePanel } from '../../components/SchedulePanel';
 import type { DailyUpdate, MaterialRequest, RequestStatus } from '../../types';
 
 const REQ_PILL: Record<RequestStatus, string> = {
@@ -346,6 +347,11 @@ export default function SiteEngineerDashboard() {
             )}
           </div>
         </Card>
+      </div>
+
+      {/* Project schedule — see milestones and mark them done */}
+      <div className="mt-6">
+        <SchedulePanel siteId={selectedSiteId} />
       </div>
 
       {/* Site photo upload → AI vision report (sent to the manager) */}

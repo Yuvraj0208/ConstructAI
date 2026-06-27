@@ -76,7 +76,7 @@ def _agent_loop(client, db: Session, site: Site, question: str) -> dict:
                     {
                         "type": "tool_result",
                         "tool_use_id": block.id,
-                        "content": run_tool(db, site, block.name, labor_rate),
+                        "content": run_tool(db, site, block.name, block.input, labor_rate),
                     }
                 )
         messages.append({"role": "user", "content": tool_results})

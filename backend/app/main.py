@@ -14,6 +14,7 @@ from .routers import (
     industries,
     materials,
     procurement,
+    schedule,
     sites,
     stock,
     vendors,
@@ -54,6 +55,7 @@ app.include_router(procurement.router)
 app.include_router(weather.router)
 app.include_router(engineering.router)
 app.include_router(ai.router)
+app.include_router(schedule.router)
 
 
 @app.get("/", tags=["health"])

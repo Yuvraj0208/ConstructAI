@@ -1,7 +1,7 @@
 """Pydantic schemas: the request/response contracts for the API."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -388,3 +388,47 @@ class SiteImageReportOut(BaseModel):
 
 class SiteImageReportDetail(SiteImageReportOut):
     image_data_url: str  # data:<mediatype>;base64,<...> for inline display
+
+
+# --------------------------------------------------------------------------- #
+# AI layer: note / daily-update search (keyword retrieval)
+# --------------------------------------------------------------------------- #
+class NoteHit(BaseModel):
+    source: str  # e.g. "Daily update", "Material request", "Purchase order"
+    text: str
+    date: str | None = None
+    score: float
+
+
+class NoteSearchOut(BaseModel):
+    query: str
+    hits: list[NoteHit] = []
+
+
+# --------------------------------------------------------------------------- #
+# Schedule milestones
+# --------------------------------------------------------------------------- #
+class MilestoneCreate(BaseModel):
+    site_id: int
+    title: str = Field(min_length=1, max_length=160)
+    target_date: date
+    sort_order: int = 0
+
+
+class MilestoneUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=160)
+    target_date: date | None = None
+    status: str | None = None  # pending | done
+    sort_order: int | None = None
+
+
+class MilestoneOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    site_id: int
+    title: str
+    target_date: date
+    status: str
+    sort_order: int
+    created_at: datetime

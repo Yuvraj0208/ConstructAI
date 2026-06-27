@@ -7,10 +7,11 @@ electrical / plumbing / manufacturing tomorrow without code changes.
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     Enum as SAEnum,
     Float,
@@ -403,3 +404,20 @@ class SiteImageReport(Base):
 
     site: Mapped["Site"] = relationship()
     author: Mapped["User | None"] = relationship()
+
+
+class Milestone(Base):
+    """A scheduled project milestone for a site. The AI reasons about schedule
+    risk by comparing target dates against the latest reported progress %."""
+
+    __tablename__ = "milestones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    target_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)  # pending | done
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    site: Mapped["Site"] = relationship()

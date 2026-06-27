@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, apiError } from '../../api/client';
 import { Button, Card, fmtMoney, fmtNum } from '../../components/ui';
+import { Icon } from '../../components/icons';
 import type { POStatus, PurchaseOrder } from '../../types';
 
 const STATUS_STYLES: Record<POStatus, string> = {
@@ -106,6 +107,7 @@ export function ProcurementPanel({
 }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [running, setRunning] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -134,6 +136,29 @@ export function ProcurementPanel({
     }
   }
 
+  async function draftAi() {
+    if (siteId == null) return;
+    setDrafting(true);
+    setError('');
+    setMessage('');
+    try {
+      const r = await api.post<PurchaseOrder[]>('/ai/draft-orders', null, {
+        params: { site_id: siteId },
+      });
+      setMessage(
+        r.data.length
+          ? `AI drafted ${r.data.length} order(s) for your approval.`
+          : 'AI found nothing that needs ordering right now.',
+      );
+      load();
+      onChange?.();
+    } catch (e) {
+      setError(apiError(e));
+    } finally {
+      setDrafting(false);
+    }
+  }
+
   async function act(id: number, action: 'approve' | 'reject') {
     try {
       await api.post(`/procurement/orders/${id}/${action}`);
@@ -156,9 +181,26 @@ export function ProcurementPanel({
             Scores vendors by price vs. ETA vs. urgency, then allocates orders to refill stock.
           </p>
         </div>
-        <Button onClick={run} disabled={running}>
-          {running ? 'Running…' : '⚡ Run auto-procurement'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" onClick={draftAi} disabled={drafting || running}>
+            {drafting ? (
+              'Drafting…'
+            ) : (
+              <>
+                <Icon name="sparkles" className="h-4 w-4" /> AI draft orders
+              </>
+            )}
+          </Button>
+          <Button onClick={run} disabled={running || drafting}>
+            {running ? (
+              'Running…'
+            ) : (
+              <>
+                <Icon name="bolt" className="h-4 w-4" /> Run auto-procurement
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {(message || error) && (

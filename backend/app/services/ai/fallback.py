@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ...config import settings
 from ...models import Site
-from . import context
+from . import context, notes
 
 
 def _money(n: float) -> str:
@@ -90,15 +90,25 @@ def _weather_answer(ctx: dict) -> tuple[str, list[dict]]:
 
 def _progress_answer(ctx: dict) -> tuple[str, list[dict]]:
     p = ctx["site_progress"]
+    sched = ctx.get("schedule", {})
+    sources = [{"label": "Site progress"}]
     if p["latest_progress"] is None:
-        return ("No engineer daily updates yet, so progress can't be assessed.", [{"label": "Site progress"}])
-    issues = "; ".join(i for i in p["open_issues"] if i)
-    issue_txt = f" Open blockers: {issues}." if issues else " No open blockers reported."
-    answer = (
-        f"Latest update: {_num(p['latest_progress'])}% complete with ~{p['avg_labor']} workers on site."
-        + issue_txt
-    )
-    return answer, [{"label": "Site progress"}]
+        text = "No engineer daily updates yet, so progress can't be assessed."
+    else:
+        issues = "; ".join(i for i in p["open_issues"] if i)
+        issue_txt = f" Open blockers: {issues}." if issues else " No open blockers reported."
+        text = (
+            f"Latest update: {_num(p['latest_progress'])}% complete with ~{p['avg_labor']} "
+            f"workers on site." + issue_txt
+        )
+    at_risk = sched.get("at_risk") or []
+    if at_risk:
+        text += " Schedule risk: " + "; ".join(at_risk[:3]) + "."
+        sources.append({"label": "Schedule"})
+    elif sched.get("milestones"):
+        text += " All milestones are on schedule."
+        sources.append({"label": "Schedule"})
+    return text, sources
 
 
 def _overview_answer(ctx: dict) -> tuple[str, list[dict]]:
@@ -107,10 +117,12 @@ def _overview_answer(ctx: dict) -> tuple[str, list[dict]]:
     w = ctx["weather"]
     prog = f"{_num(p['latest_progress'])}% complete" if p["latest_progress"] is not None else "no progress logged"
     rain = "rain expected" if w.get("will_rain") else "clear weather"
+    at_risk = (ctx.get("schedule", {}).get("at_risk")) or []
+    sched_txt = f" {len(at_risk)} milestone(s) at risk." if at_risk else ""
     answer = (
         f"{ctx['stock_health']['site']}: {c.get('critical', 0)} critical / {c.get('low', 0)} low "
-        f"of {sum(c.values())} materials, {prog}, {rain} in {w.get('city')}. "
-        f"Ask about ordering, usage spikes, the budget, weather, or progress for detail."
+        f"of {sum(c.values())} materials, {prog}, {rain} in {w.get('city')}.{sched_txt} "
+        f"Ask about ordering, usage spikes, the budget, weather, schedule, or progress for detail."
     )
     return answer, [{"label": "Stock levels"}, {"label": "Site progress"}, {"label": "Weather"}]
 
@@ -127,17 +139,30 @@ def answer(db: Session, site: Site, question: str) -> dict:
     def has(*words: str) -> bool:
         return any(w in q for w in words)
 
+    augment = False  # whether to enrich with a relevant field note
     if has("order", "buy", "purchase", "procure", "reorder", "restock", "supplier", "vendor"):
         text, sources = _order_answer(ctx)
     elif has("spike", "why", "jump", "surge", "unusual", "theft", "waste", "consum", "usage", "used"):
         text, sources = _usage_answer(ctx)
+        augment = True
     elif has("budget", "cost", "spend", "spent", "money", "expensive", "afford", "over"):
         text, sources = _budget_answer(ctx)
     elif has("weather", "rain", "storm", "monsoon"):
         text, sources = _weather_answer(ctx)
-    elif has("progress", "schedule", "behind", "delay", "labour", "labor", "worker", "manpower", "track"):
+    elif has("progress", "schedule", "milestone", "deadline", "behind", "delay", "labour", "labor", "worker", "manpower", "track"):
         text, sources = _progress_answer(ctx)
+        augment = True
     else:
         text, sources = _overview_answer(ctx)
+        augment = True
+
+    if augment:
+        hits = notes.search_notes(db, site, question, k=1)
+        if hits:
+            h = hits[0]
+            dt = f" · {h['date']}" if h.get("date") else ""
+            text += f" Related note ({h['source']}{dt}): “{h['text']}”"
+            if not any(s["label"] == "Field notes" for s in sources):
+                sources.append({"label": "Field notes"})
 
     return {"answer": text, "sources": sources, "used_ai": False}

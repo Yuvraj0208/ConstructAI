@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..deps import require_role
-from ..models import Budget, Role, Site, User
+from ..models import Budget, PurchaseOrder, Role, Site, User
 from ..schemas import (
     AiStatusOut,
     AskRequest,
@@ -23,11 +23,16 @@ from ..schemas import (
     BudgetForecastOut,
     BudgetOut,
     BudgetUpdate,
+    NoteHit,
+    NoteSearchOut,
+    PurchaseOrderOut,
     SpendBreakdown,
 )
 from ..services.ai import ask as ai_ask
 from ..services.ai import build_forecast, propose_budget
 from ..services.ai.client import ai_enabled
+from ..services.ai.draft import draft_orders
+from ..services.ai.notes import search_notes
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -142,3 +147,44 @@ def update_budget(
     db.commit()
     db.refresh(budget)
     return _forecast_out(db, budget.site, budget)
+
+
+@router.get("/notes/search", response_model=NoteSearchOut)
+def notes_search(
+    site_id: int,
+    q: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(Role.MANAGER)),
+) -> NoteSearchOut:
+    """Keyword-search a site's free-text history (daily updates, requests, notes…)."""
+    site = _get_site(db, site_id)
+    return NoteSearchOut(query=q, hits=[NoteHit(**h) for h in search_notes(db, site, q)])
+
+
+def _po_out(po: PurchaseOrder) -> PurchaseOrderOut:
+    return PurchaseOrderOut(
+        id=po.id,
+        material_id=po.material_id,
+        vendor_id=po.vendor_id,
+        quantity=po.quantity,
+        price_per_unit=po.price_per_unit,
+        total_price=po.total_price,
+        eta_days=po.eta_days,
+        status=po.status,
+        rationale=po.rationale,
+        created_at=po.created_at,
+        decided_at=po.decided_at,
+        material_name=po.material.name if po.material else None,
+        vendor_name=po.vendor.name if po.vendor else None,
+    )
+
+
+@router.post("/draft-orders", response_model=list[PurchaseOrderOut])
+def ai_draft_orders(
+    site_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(Role.MANAGER)),
+) -> list[PurchaseOrderOut]:
+    """AI-draft SUGGESTED purchase orders for the manager to approve."""
+    site = _get_site(db, site_id)
+    return [_po_out(po) for po in draft_orders(db, site)]

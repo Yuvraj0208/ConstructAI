@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from ...models import (
     DailyUpdate,
     Material,
+    Milestone,
     MovementType,
     POStatus,
     PurchaseOrder,
@@ -254,6 +255,45 @@ def spend_summary(db: Session, site: Site, labor_rate: float) -> dict:
     }
 
 
+def schedule(db: Session, site: Site) -> dict:
+    """Project milestones with days-to-target + which are overdue/at-risk vs. progress."""
+    today = datetime.now(timezone.utc).date()
+    milestones = list(
+        db.scalars(
+            select(Milestone)
+            .where(Milestone.site_id == site.id)
+            .order_by(Milestone.sort_order, Milestone.target_date)
+        ).all()
+    )
+    latest = db.scalar(
+        select(DailyUpdate)
+        .where(DailyUpdate.site_id == site.id)
+        .order_by(DailyUpdate.created_at.desc())
+    )
+    rows, at_risk = [], []
+    for m in milestones:
+        days = (m.target_date - today).days
+        done = m.status == "done"
+        rows.append(
+            {
+                "title": m.title,
+                "target_date": m.target_date.isoformat(),
+                "days_remaining": days,
+                "done": done,
+            }
+        )
+        if not done and days < 0:
+            at_risk.append(f"{m.title} overdue by {-days} day(s)")
+        elif not done and days <= 7:
+            at_risk.append(f"{m.title} due in {days} day(s)")
+    return {
+        "today": today.isoformat(),
+        "latest_progress": _round(latest.progress_percent) if latest else None,
+        "milestones": rows,
+        "at_risk": at_risk,
+    }
+
+
 def full_context(db: Session, site: Site, labor_rate: float) -> dict:
     """Everything at once — used to brief the agent and to drive the fallback."""
     return {
@@ -264,4 +304,5 @@ def full_context(db: Session, site: Site, labor_rate: float) -> dict:
         "site_progress": site_progress(db, site),
         "open_orders": open_orders(db, site),
         "spend_summary": spend_summary(db, site, labor_rate),
+        "schedule": schedule(db, site),
     }

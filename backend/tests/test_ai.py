@@ -128,3 +128,102 @@ def test_photo_upload_rejects_non_image(client, seed_data):
         headers=eng,
     )
     assert res.status_code == 400, res.text
+
+
+# --- Note search (keyword RAG) ---
+def test_note_search_finds_daily_update(client, seed_data):
+    eng = login(client, "engineer@test.dev")
+    up = client.post(
+        "/engineering/daily-updates",
+        json={
+            "site_id": seed_data["site_id"],
+            "progress_percent": 40,
+            "summary": "Extra concrete pour on Block B foundation today",
+            "labor_count": 20,
+            "issues": "waiting on steel delivery",
+        },
+        headers=eng,
+    )
+    assert up.status_code == 201, up.text
+    mgr = login(client, "manager@test.dev")
+    res = client.get(
+        "/ai/notes/search",
+        params={"site_id": seed_data["site_id"], "q": "concrete pour Block B"},
+        headers=mgr,
+    )
+    assert res.status_code == 200, res.text
+    hits = res.json()["hits"]
+    assert len(hits) >= 1
+    assert hits[0]["source"] == "Daily update"
+    assert "block" in hits[0]["text"].lower()
+
+
+def test_note_search_requires_manager(client, seed_data):
+    stock = login(client, "stock@test.dev")
+    res = client.get(
+        "/ai/notes/search", params={"site_id": seed_data["site_id"], "q": "x"}, headers=stock
+    )
+    assert res.status_code == 403, res.text
+
+
+# --- AI auto-draft purchase orders ---
+def test_ai_draft_orders_creates_suggestions(client, seed_data):
+    mgr = login(client, "manager@test.dev")
+    res = client.post("/ai/draft-orders", params={"site_id": seed_data["site_id"]}, headers=mgr)
+    assert res.status_code == 200, res.text
+    orders = res.json()
+    assert len(orders) >= 1
+    assert all(o["status"] == "suggested" for o in orders)
+    assert any(o["material_name"] == "Cement" for o in orders)
+
+
+def test_draft_orders_requires_manager(client, seed_data):
+    eng = login(client, "engineer@test.dev")
+    res = client.post("/ai/draft-orders", params={"site_id": seed_data["site_id"]}, headers=eng)
+    assert res.status_code == 403, res.text
+
+
+# --- Schedule milestones ---
+def test_milestone_crud(client, seed_data):
+    mgr = login(client, "manager@test.dev")
+    created = client.post(
+        "/schedule/milestones",
+        json={"site_id": seed_data["site_id"], "title": "Foundation complete", "target_date": "2026-07-15"},
+        headers=mgr,
+    )
+    assert created.status_code == 201, created.text
+    mid = created.json()["id"]
+    assert created.json()["status"] == "pending"
+
+    listing = client.get("/schedule/milestones", params={"site_id": seed_data["site_id"]}, headers=mgr)
+    assert listing.status_code == 200
+    assert any(m["id"] == mid for m in listing.json())
+
+    done = client.patch(f"/schedule/milestones/{mid}", json={"status": "done"}, headers=mgr)
+    assert done.status_code == 200
+    assert done.json()["status"] == "done"
+
+    assert client.delete(f"/schedule/milestones/{mid}", headers=mgr).status_code == 204
+
+
+def test_milestone_create_requires_manager(client, seed_data):
+    eng = login(client, "engineer@test.dev")
+    res = client.post(
+        "/schedule/milestones",
+        json={"site_id": seed_data["site_id"], "title": "X", "target_date": "2026-07-15"},
+        headers=eng,
+    )
+    assert res.status_code == 403, res.text
+
+
+def test_engineer_can_mark_milestone_done(client, seed_data):
+    mgr = login(client, "manager@test.dev")
+    mid = client.post(
+        "/schedule/milestones",
+        json={"site_id": seed_data["site_id"], "title": "Slab", "target_date": "2026-07-15"},
+        headers=mgr,
+    ).json()["id"]
+    eng = login(client, "engineer@test.dev")
+    res = client.patch(f"/schedule/milestones/{mid}", json={"status": "done"}, headers=eng)
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "done"

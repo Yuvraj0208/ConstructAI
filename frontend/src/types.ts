@@ -254,3 +254,27 @@ export interface SiteImageReport {
 export interface SiteImageReportDetail extends SiteImageReport {
   image_data_url: string;
 }
+
+export interface NoteHit {
+  source: string;
+  text: string;
+  date?: string | null;
+  score: number;
+}
+
+export interface NoteSearchResult {
+  query: string;
+  hits: NoteHit[];
+}
+
+export type MilestoneStatus = 'pending' | 'done';
+
+export interface Milestone {
+  id: number;
+  site_id: number;
+  title: string;
+  target_date: string; // ISO date
+  status: MilestoneStatus;
+  sort_order: number;
+  created_at: string;
+}

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import random
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -22,6 +22,7 @@ from .models import (
     Material,
     MaterialRequest,
     MaterialRequestItem,
+    Milestone,
     MovementType,
     Role,
     Site,
@@ -533,6 +534,27 @@ def seed(reset: bool = False) -> None:
             db.flush()
             for (mname, qty) in d["request"]:
                 db.add(MaterialRequestItem(request_id=mreq.id, material_id=mats[mname].id, quantity=qty))
+
+        # Schedule milestones per site — varied dates so schedule risk is visible
+        # (one done, one overdue, one due-soon, one further out).
+        today = date.today()
+        milestone_plan = [
+            ("Phase 1 — site setup", -45, "done"),
+            ("Phase 2 — main works", -4, "pending"),
+            ("Phase 3 — fit-out", 6, "pending"),
+            ("Handover & inspection", 35, "pending"),
+        ]
+        for site in db.scalars(select(Site)).all():
+            for i, (title, offset, st) in enumerate(milestone_plan):
+                db.add(
+                    Milestone(
+                        site_id=site.id,
+                        title=title,
+                        target_date=today + timedelta(days=offset),
+                        status=st,
+                        sort_order=i,
+                    )
+                )
 
         db.commit()
         print("Seed complete.\n")
