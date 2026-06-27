@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Bar,
   BarChart,
@@ -10,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { api } from '../../api/client';
+import { api, apiError } from '../../api/client';
 import { useSite } from '../../site/SiteContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { Layout } from '../../components/Layout';
@@ -66,11 +67,13 @@ const KPI_TONES: Record<string, { grad: string; ring: string; text: string; chip
 function Kpi({
   label,
   value,
+  hint,
   tone = 'slate',
   icon,
 }: {
   label: string;
   value: number;
+  hint?: string;
   tone?: string;
   icon?: IconName;
 }) {
@@ -88,7 +91,60 @@ function Kpi({
         )}
       </div>
       <div className={`mt-2 text-3xl font-extrabold ${t.text}`}>{value}</div>
+      <div className="mt-0.5 text-[11px] font-medium text-slate-400">{hint}</div>
     </div>
+  );
+}
+
+/** A labelled section divider so the long dashboard reads as organised groups. */
+function SectionLabel({ icon, children }: { icon: IconName; children: ReactNode }) {
+  return (
+    <div className="mt-9 mb-4 flex items-center gap-2.5">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+        <Icon name={icon} className="h-4 w-4" />
+      </span>
+      <h2 className="text-xs font-bold tracking-[0.16em] text-slate-500 uppercase">{children}</h2>
+      <div className="h-px flex-1 bg-gradient-to-r from-slate-200 to-transparent" />
+    </div>
+  );
+}
+
+function ActionBtn({
+  icon,
+  label,
+  onClick,
+  loading = false,
+  disabled = false,
+  primary = false,
+}: {
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold transition active:scale-95 disabled:opacity-60 ${
+        primary
+          ? 'bg-white text-indigo-700 shadow-sm hover:bg-white/90'
+          : 'bg-white/15 text-white ring-1 ring-white/25 hover:bg-white/25'
+      }`}
+    >
+      {loading ? (
+        <span
+          className={`h-4 w-4 animate-spin rounded-full border-2 ${
+            primary ? 'border-indigo-200 border-t-indigo-600' : 'border-white/40 border-t-white'
+          }`}
+        />
+      ) : (
+        <Icon name={icon} className="h-4 w-4" />
+      )}
+      {label}
+    </button>
   );
 }
 
@@ -101,12 +157,18 @@ export default function ManagerDashboard() {
   const [usage, setUsage] = useState<DailyUsage[]>([]);
   const [usageLoading, setUsageLoading] = useState(false);
 
-  useEffect(() => {
+  // Top command-bar actions refresh the panels by bumping this key.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [acting, setActing] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState('');
+  const [actionErr, setActionErr] = useState('');
+  const aiRef = useRef<HTMLDivElement>(null);
+
+  function loadOffers() {
     if (selectedSiteId == null) return;
-    api
-      .get<Offer[]>('/vendors/offers', { params: { site_id: selectedSiteId } })
-      .then((res) => setOffers(res.data));
-  }, [selectedSiteId]);
+    api.get<Offer[]>('/vendors/offers', { params: { site_id: selectedSiteId } }).then((res) => setOffers(res.data));
+  }
+  useEffect(loadOffers, [selectedSiteId]);
 
   // When the material list changes (e.g. industry switch), pick a sensible default.
   useEffect(() => {
@@ -136,48 +198,112 @@ export default function ManagerDashboard() {
   const analysis = useMemo(() => analyzeUsage(usage), [usage]);
   const selectedMat = materials.find((m) => m.id === selectedMaterial);
 
+  async function runAction(kind: string, fn: () => Promise<string>) {
+    if (selectedSiteId == null) return;
+    setActing(kind);
+    setActionErr('');
+    setActionMsg('');
+    try {
+      const msg = await fn();
+      setActionMsg(msg);
+      await reload();
+      loadOffers();
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setActionErr(apiError(e));
+    } finally {
+      setActing(null);
+    }
+  }
+
+  const runProcurement = () =>
+    runAction('run', async () => {
+      const r = await api.post('/procurement/run', null, { params: { site_id: selectedSiteId } });
+      return r.data.message ?? 'Auto-procurement complete.';
+    });
+
+  const draftOrders = () =>
+    runAction('draft', async () => {
+      const r = await api.post<unknown[]>('/ai/draft-orders', null, { params: { site_id: selectedSiteId } });
+      return r.data.length
+        ? `AI drafted ${r.data.length} order(s) for your approval.`
+        : 'AI found nothing that needs ordering right now.';
+    });
+
+  const reproposeBudget = () =>
+    runAction('budget', async () => {
+      await api.post('/ai/budget/propose', null, { params: { site_id: selectedSiteId } });
+      return 'Budget re-proposed by the AI.';
+    });
+
+  function scrollToAi() {
+    aiRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
-    <Layout
-      title="Manager Dashboard"
-      subtitle="Stock health, usage analytics, and vendor offers at a glance"
-    >
-      {/* KPIs */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Kpi label="Materials" value={counts.total} icon="box" />
-        <Kpi label="Low stock" value={counts.low} tone="amber" icon="alert" />
-        <Kpi label="Critical" value={counts.critical} tone="rose" icon="critical" />
-        <Kpi label="Active offers" value={offers.length} tone="indigo" icon="tag" />
+    <Layout title="Manager Dashboard" subtitle="Stock health, AI insights & site operations — in one place">
+      {/* ===== Command bar (primary actions, up top) ===== */}
+      <Card className="overflow-hidden">
+        <div className="flex flex-col gap-3 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-white">
+            <div className="text-[11px] font-semibold tracking-wider text-white/70 uppercase">
+              {selectedSite?.name ?? 'Site'} · command center
+            </div>
+            <div className="text-lg font-bold">Quick actions</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <ActionBtn primary icon="bolt" label="Run procurement" loading={acting === 'run'} disabled={!!acting} onClick={runProcurement} />
+            <ActionBtn icon="sparkles" label="AI draft orders" loading={acting === 'draft'} disabled={!!acting} onClick={draftOrders} />
+            <ActionBtn icon="refresh" label="Re-propose budget" loading={acting === 'budget'} disabled={!!acting} onClick={reproposeBudget} />
+            <ActionBtn icon="send" label="Ask AI" onClick={scrollToAi} />
+            <Link
+              to="/app/portfolio"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3.5 py-2 text-sm font-semibold text-white ring-1 ring-white/25 transition hover:bg-white/25 active:scale-95"
+            >
+              <Icon name="layers" className="h-4 w-4" /> Portfolio
+            </Link>
+          </div>
+        </div>
+        {(actionMsg || actionErr) && (
+          <div
+            className={`px-5 py-2.5 text-sm font-medium ${
+              actionErr ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
+            }`}
+          >
+            {actionErr || actionMsg}
+          </div>
+        )}
+      </Card>
+
+      {/* ===== KPIs ===== */}
+      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Kpi label="Materials" value={counts.total} hint="tracked on this site" icon="box" />
+        <Kpi label="Low stock" value={counts.low} hint="below threshold" tone="amber" icon="alert" />
+        <Kpi label="Critical" value={counts.critical} hint="need ordering" tone="rose" icon="critical" />
+        <Kpi label="Active offers" value={offers.length} hint="from vendors" tone="indigo" icon="tag" />
       </div>
 
-      {/* AI: natural-language insights + AI-proposed budget */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <AskAiPanel siteId={selectedSiteId} />
-        <BudgetPanel siteId={selectedSiteId} />
+      {/* ===== AI & insights ===== */}
+      <div ref={aiRef}>
+        <SectionLabel icon="sparkles">AI &amp; insights</SectionLabel>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <AskAiPanel siteId={selectedSiteId} />
+          <BudgetPanel key={`budget-${refreshKey}`} siteId={selectedSiteId} />
+        </div>
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
+          <SchedulePanel siteId={selectedSiteId} canManage />
+          <NotesSearchPanel siteId={selectedSiteId} />
+        </div>
       </div>
 
-      {/* Schedule milestones + site-log search */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <SchedulePanel siteId={selectedSiteId} canManage />
-        <NotesSearchPanel siteId={selectedSiteId} />
-      </div>
+      {/* ===== Operations ===== */}
+      <SectionLabel icon="box">Operations</SectionLabel>
 
-      {/* Weather + site progress */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <WeatherPanel city={selectedSite?.city} siteId={selectedSiteId} />
-        <SiteProgressPanel siteId={selectedSiteId} />
-      </div>
-
-      {/* Site-photo AI vision reports from the field */}
-      <div className="mt-6">
-        <SitePhotosPanel siteId={selectedSiteId} />
-      </div>
-
-      {/* Expiry alerts (only renders when something is expiring/expired) */}
-      <div className="mt-6 empty:mt-0">
+      <div className="empty:hidden">
         <ExpiryPanel siteId={selectedSiteId} />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+      <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {/* Stock overview */}
         <Card className="lg:col-span-1">
           <div className="border-b border-slate-100 px-5 py-3 text-sm font-semibold text-slate-700">
@@ -305,18 +431,16 @@ export default function ManagerDashboard() {
         </Card>
       </div>
 
-      {/* Auto-procurement engine */}
-      <div className="mt-6">
-        <ProcurementPanel siteId={selectedSiteId} onChange={reload} />
+      {/* Auto-procurement orders (actions live in the command bar above) */}
+      <div className="mt-5">
+        <ProcurementPanel key={`proc-${refreshKey}`} siteId={selectedSiteId} onChange={reload} showActions={false} />
       </div>
 
       {/* Vendor offers */}
-      <Card className="mt-6">
+      <Card className="mt-5">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
           <span className="text-sm font-semibold text-slate-700">Vendor offers</span>
-          <span className="text-xs text-slate-400">
-            Auto-ranking by price vs. ETA — approval flow coming next
-          </span>
+          <span className="text-xs text-slate-400">Auto-ranking by price vs. ETA</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -350,6 +474,16 @@ export default function ManagerDashboard() {
           </table>
         </div>
       </Card>
+
+      {/* ===== Site status ===== */}
+      <SectionLabel icon="mapPin">Site status</SectionLabel>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <WeatherPanel city={selectedSite?.city} siteId={selectedSiteId} />
+        <SiteProgressPanel siteId={selectedSiteId} />
+      </div>
+      <div className="mt-5">
+        <SitePhotosPanel siteId={selectedSiteId} />
+      </div>
     </Layout>
   );
 }

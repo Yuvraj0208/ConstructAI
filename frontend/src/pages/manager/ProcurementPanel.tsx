@@ -101,9 +101,11 @@ function OrdersTable({
 export function ProcurementPanel({
   siteId,
   onChange,
+  showActions = true,
 }: {
   siteId?: number | null;
   onChange?: () => void;
+  showActions?: boolean;
 }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [running, setRunning] = useState(false);
@@ -181,26 +183,28 @@ export function ProcurementPanel({
             Scores vendors by price vs. ETA vs. urgency, then allocates orders to refill stock.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={draftAi} disabled={drafting || running}>
-            {drafting ? (
-              'Drafting…'
-            ) : (
-              <>
-                <Icon name="sparkles" className="h-4 w-4" /> AI draft orders
-              </>
-            )}
-          </Button>
-          <Button onClick={run} disabled={running || drafting}>
-            {running ? (
-              'Running…'
-            ) : (
-              <>
-                <Icon name="bolt" className="h-4 w-4" /> Run auto-procurement
-              </>
-            )}
-          </Button>
-        </div>
+        {showActions && (
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" onClick={draftAi} disabled={drafting || running}>
+              {drafting ? (
+                'Drafting…'
+              ) : (
+                <>
+                  <Icon name="sparkles" className="h-4 w-4" /> AI draft orders
+                </>
+              )}
+            </Button>
+            <Button onClick={run} disabled={running || drafting}>
+              {running ? (
+                'Running…'
+              ) : (
+                <>
+                  <Icon name="bolt" className="h-4 w-4" /> Run auto-procurement
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
 
       {(message || error) && (
