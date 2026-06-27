@@ -19,7 +19,7 @@ and now reasons about it all in plain English.
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Claude](https://img.shields.io/badge/AI-Claude_Opus_4.8-D97757?logo=anthropic&logoColor=white)
 
-**Milestones 1–3 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting & vision
+**Milestones 1–4 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting, vision, note-search & scheduling
 
 </div>
 
@@ -94,8 +94,9 @@ account below — the login screen has one-click buttons; the free backend may t
 - **Sites** are the operational unit; a **site switcher** scopes every screen
 - **5 industries** shipped end-to-end — Construction, Electrical, Plumbing, HVAC, Painting
 
-**🧠 AI layer** — natural-language insights, AI-proposed budgeting, and site-photo
-vision analysis (see [below](#the-ai-layer-milestone-3)).
+**🧠 AI layer** — natural-language insights, AI-proposed budgeting, site-photo vision
+analysis, keyword **note search**, an **AI purchase-order drafting agent**, and **schedule
+milestones** the AI reasons about (see [below](#the-ai-layer-milestone-3)).
 
 **🎨 A UI that doesn't look generic** — a "Blueprint Aurora" construction theme with a
 dusk-skyline + tower-crane hero, scroll-animated landing, and a **per-role themed
@@ -145,6 +146,22 @@ A site engineer uploads a progress photo; Claude **vision** returns a structured
 estimated completion %, key observations, **safety flags** (missing PPE / hazards),
 materials visible, and an overall status — which lands in the **manager's photo-reports
 grid**. (Photos are stored in Postgres so they survive the free tier's ephemeral disk.)
+
+### 🔎 Search the site log (note retrieval / RAG)
+Keyword search across the site's free-text history — daily updates, material requests,
+purchase-order rationales, stock notes and photo reports — so the agent can recall *why*
+something happened. It's both a **"search the site log"** box and a tool the agent calls.
+Lexical today, with a clean seam to add real vector embeddings behind a key later.
+
+### 🧾 AI draft-orders agent
+One click drafts purchase orders for the manager to approve. The agent only ever picks from
+**real** vendor offers and stays within the **remaining budget** — so it can't invent prices
+or vendors. With no key it falls back to the deterministic auto-procurement engine.
+
+### 🗓️ Schedule milestones
+Per-site milestones with **overdue / at-risk** tracking. The AI folds schedule risk into its
+answers (*"Phase 2 overdue by 4 days"*); the labour rate that drives the budget is editable
+inline.
 
 > **Turn on live Claude:** set `ANTHROPIC_API_KEY` on the Render service → redeploy. The
 > badge flips to **"Live AI"** and Ask / Budget / Vision all run through Claude. No key =
@@ -205,7 +222,7 @@ ConstructAI/
 │  │  │                     #   budget, vision, fallback
 │  │  └─ routers/           # auth, industries, sites, materials, stock, vendors,
 │  │                        #   procurement, weather, engineering, ai
-│  ├─ tests/                # pytest — engine, inventory, API lifecycle, AI (34 tests)
+│  ├─ tests/                # pytest — engine, inventory, API lifecycle, AI (41 tests)
 │  ├─ alembic/              # database migrations (alembic upgrade head)
 │  └─ requirements.txt
 └─ frontend/
@@ -283,10 +300,11 @@ cd backend
 .venv/Scripts/python.exe -m pytest
 ```
 
-**34 tests** — engine (urgency, scoring, allocation, rain buffer), inventory
+**41 tests** — engine (urgency, scoring, allocation, rain buffer), inventory
 (reserve/available, batch FIFO, expiry buckets), API lifecycle (auth, role guards, site
 scoping, suggest→approve→accept→receive, engineer daily-update + material-request →
-issue), and the AI layer (status, insights, budgeting, photo upload) on the no-key path.
+issue), and the AI layer (status, insights, budgeting, photo vision, note search, AI
+draft-orders, schedule milestones) on the no-key path.
 
 ---
 
@@ -342,6 +360,9 @@ Interactive OpenAPI docs are at `/docs`. Highlights:
 | `POST` | `/ai/ask` | natural-language insight (manager) |
 | `GET`/`POST` | `/ai/budget` · `/ai/budget/propose` | AI-proposed budget + forecast |
 | `PATCH`| `/ai/budget/{id}` | manager adjusts the budget |
+| `GET`  | `/ai/notes/search` | keyword search across the site's notes & updates |
+| `POST` | `/ai/draft-orders` | AI drafts purchase orders for approval |
+| `GET`/`POST`/`PATCH`/`DELETE` | `/schedule/milestones` | per-site schedule milestones |
 </details>
 
 ---
@@ -373,10 +394,18 @@ Interactive OpenAPI docs are at `/docs`. Highlights:
 - [x] **Phase 2** — site-photo **vision** analysis (progress %, safety flags, materials)
 - [x] No-key rule-based fallback so the demo runs free; one switch flips it to live Claude
 
+**Milestone 4 — Deeper AI** ✅
+- [x] **Note search (RAG)** — keyword retrieval over daily updates, requests, order
+      rationales & photo reports, surfaced to the agent and a "search the site log" box
+- [x] **AI draft-orders agent** — drafts purchase orders (from real offers, within budget)
+      for the manager to approve
+- [x] **Schedule milestones** — per-site milestones with overdue / at-risk tracking that the
+      AI ties into its answers (labour rate is configurable in the budget panel)
+
 **Future ideas**
-- [ ] Vector RAG over notes & daily updates
-- [ ] An agent that auto-drafts purchase orders for approval
-- [ ] In-app labour-rate config and schedule milestones
+- [ ] Real vector embeddings behind an optional key (e.g. Voyage AI) for semantic search
+- [ ] Auto-notify vendors / managers on critical shortfalls
+- [ ] Multi-site portfolio rollup for executives
 
 ---
 
