@@ -19,7 +19,7 @@ and now reasons about it all in plain English.
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?logo=tailwindcss&logoColor=white)
 ![Claude](https://img.shields.io/badge/AI-Claude_Opus_4.8-D97757?logo=anthropic&logoColor=white)
 
-**Milestones 1–4 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting, vision, note-search, scheduling & a portfolio rollup
+**Milestones 1–4 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting, vision, note-search, scheduling, a portfolio rollup & a mobile field app
 
 </div>
 
@@ -98,6 +98,12 @@ account below — the login screen has one-click buttons; the free backend may t
 **🧠 AI layer** — natural-language insights, AI-proposed budgeting, site-photo vision
 analysis, keyword **note search**, an **AI purchase-order drafting agent**, and **schedule
 milestones** the AI reasons about (see [below](#the-ai-layer-milestone-3)).
+
+**📱 Field app (installable mobile PWA)** — a separate phone-first app in [`mobile/`](mobile)
+for **stock handlers & site engineers** to post from site: record movements, issue requests,
+receive deliveries, send daily updates, request materials, and **snap + upload site photos**
+(camera capture). Own login, bottom-tab nav, "Add to Home Screen" → runs full-screen like a
+native app. Reuses the same API; deploy as a second Vercel project (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 **🎨 A UI that doesn't look generic** — a "Blueprint Aurora" construction theme with a
 dusk-skyline + tower-crane hero, scroll-animated landing, and a **per-role themed
@@ -226,13 +232,15 @@ ConstructAI/
 │  ├─ tests/                # pytest — engine, inventory, API lifecycle, AI (43 tests)
 │  ├─ alembic/              # database migrations (alembic upgrade head)
 │  └─ requirements.txt
-└─ frontend/
-   └─ src/
-      ├─ api/client.ts          # axios + token handling
-      ├─ auth/AuthContext.tsx   # login / signup / session
-      ├─ site/SiteContext.tsx   # multi-site switcher state
-      ├─ components/            # Layout, RoleBackdrop, icons, SitePhotosPanel, UI kit
-      └─ pages/                # Landing, Login, Signup + manager/stock/engineer/vendor
+├─ frontend/
+│  └─ src/
+│     ├─ api/client.ts          # axios + token handling
+│     ├─ auth/AuthContext.tsx   # login / signup / session
+│     ├─ site/SiteContext.tsx   # multi-site switcher state
+│     ├─ components/            # Layout, RoleBackdrop, icons, SitePhotosPanel, UI kit
+│     └─ pages/                # Landing, Login, Signup + manager/stock/engineer/vendor
+└─ mobile/                     # installable field PWA (stock handler + site engineer)
+   └─ src/                     # AppShell (bottom tabs), pages/stock/*, pages/engineer/*
 ```
 
 ---

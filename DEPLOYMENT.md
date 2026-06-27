@@ -51,6 +51,21 @@ Environment Variable** → `ANTHROPIC_API_KEY` = your key (from
 https://console.anthropic.com), then redeploy. Leave it unset to keep the free demo
 running. The dashboard shows a **"Live AI" / "Demo"** badge for the active mode.
 
+## 5. Field app (mobile PWA) — optional
+
+A separate phone-first app for **stock handlers & site engineers** lives in
+[`mobile/`](mobile). Deploy it as a **second Vercel project** (it reuses the same backend):
+
+1. Vercel → **Add New → Project** → import the same `ConstructAI` repo.
+2. Set **Root Directory = `mobile`** (auto-detects Vite).
+3. Add env var `VITE_API_URL` = your Render URL (e.g. `https://constructai-api.onrender.com`).
+4. **Deploy.** It lands at its own `*.vercel.app` URL (already CORS-allowed).
+
+Field staff open that link on their phone once and **Add to Home Screen** — it installs as a
+full-screen app with its own login (stock handler / site engineer only; managers & vendors are
+sent to the web dashboard). It includes camera capture for site photos. Locally:
+`cd mobile && npm install && npm run dev`.
+
 ## Demo data
 
 The deploy seeds demo data automatically: **5 industries, 6 sites, every role**. Logins
