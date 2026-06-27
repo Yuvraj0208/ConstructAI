@@ -1,46 +1,187 @@
-# ConstructAI — Material Procurement Platform
+<div align="center">
 
-### 🚀 Live demo: **https://construct-ai-eosin.vercel.app**
+# 🏗️ ConstructAI
 
-Try it with any demo login below (password `password123`):
-**`manager@`** · **`stock@`** · **`engineer@`** · **`vendor1@constructai.dev`** — the login
-screen has one-click buttons too. *(The free backend may take ~30s to wake on the first
-request, then it's fast.)*
+### AI-native material procurement for construction — and every other trade.
+
+Track stock, auto-reorder from the best vendor, forecast budgets, and read the
+site from a photo. ConstructAI watches every site's inventory, calls the right
+vendors the moment you dip below threshold, balances price against delivery speed,
+and now reasons about it all in plain English.
+
+[![Live Demo](https://img.shields.io/badge/▶_Live_Demo-construct--ai.vercel.app-6366F1?style=for-the-badge)](https://construct-ai-eosin.vercel.app)
+
+![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?logo=tailwindcss&logoColor=white)
+![Claude](https://img.shields.io/badge/AI-Claude_Opus_4.8-D97757?logo=anthropic&logoColor=white)
+
+**Milestones 1–3 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting & vision
+
+</div>
 
 ---
 
-An AI-ready material procurement system. It tracks material stock (with per-batch
-expiry and safety-stock reserves), lets vendors post price + delivery ETA, and
-auto-reorders by balancing price against delivery speed when stock dips below
-threshold — with a manager approving.
+## Table of contents
 
-Built **industry-agnostic** and shipping with **5 industries** — Construction,
-Electrical, Plumbing, HVAC, and Painting & Finishing — each fully functional.
-
-> Status: **Milestones 1 & 2 + extras complete** and verified end-to-end — auth + 3
-> role dashboards, stock ledger, vendor offers, usage analytics with anomaly detection,
-> the **auto-procurement engine** (price-vs-ETA-vs-urgency + approval flow), the
-> **weather module** (live forecast + rain buffer), **per-batch expiry tracking** (FIFO),
-> and **reserve safety stock** per material. Runs on **PostgreSQL**. See the [roadmap](#roadmap).
+- [What is ConstructAI?](#what-is-constructai)
+- [Highlights](#highlights)
+- [The four roles](#the-four-roles)
+- [The AI layer (Milestone 3)](#the-ai-layer-milestone-3)
+- [How the procurement engine works](#how-the-procurement-engine-works)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Run it locally](#run-it-locally)
+- [Deploy (Vercel + Render)](#deploy-vercel--render)
+- [API reference](#api-reference)
+- [Roadmap](#roadmap)
+- [Configuration & notes](#configuration--notes)
 
 ---
 
-## Four roles, multiple sites
+## What is ConstructAI?
+
+Construction (and electrical, plumbing, HVAC, painting…) runs on materials arriving
+on time at the right price. Run out of cement and the pour stops; over-order and cash
+is tied up in a yard. ConstructAI turns material procurement into a closed loop:
+
+> **Stock handlers** log what's used → the system spots low/critical materials →
+> the **auto-procurement engine** ranks every vendor by price vs. delivery speed and
+> drafts orders → the **manager** approves → the **vendor** confirms → stock is
+> received back in. Meanwhile **site engineers** send daily progress and request
+> materials, **live weather** buffers rain-sensitive stock, and an **AI layer**
+> answers questions, proposes budgets, and reads site photos.
+
+It's built **industry-agnostic** from the ground up — the same platform ships with
+**five fully-working industries**, and a company can run **many sites** at once, each
+with its own stock and procurement, switchable from the top bar.
+
+**[▶ Try the live demo →](https://construct-ai-eosin.vercel.app)** (log in with any
+account below — the login screen has one-click buttons; the free backend may take
+~30s to wake on the first request, then it's fast.)
+
+---
+
+## Highlights
+
+**📦 Inventory that reflects reality**
+- Per-material **thresholds** with ok / low / critical status
+- Append-only **stock ledger** (usage / delivery / adjustment)
+- **Per-batch expiry** — deliveries become batches, consumption is **FIFO** (oldest
+  expiry first), and the manager sees expired / expiring-soon alerts
+- **Safety reserves** — hold back `reserve_percent` per material; everything works off
+  *available* stock (current − reserved)
+
+**🤖 Auto-procurement engine**
+- The moment available stock ≤ threshold, score every active vendor offer on
+  **price vs. ETA vs. urgency** (weighting shifts toward *speed* as the shortage gets
+  critical) and **split the order** across vendors to hit the deadline at the best price
+- Full lifecycle: engine **suggests** → manager **approves / rejects** → vendor
+  **accepts** → stock handler **receives** (auto stock movement + new batch)
+
+**🌦️ Weather-aware**
+- City-wise live forecast (Open-Meteo, key-less; deterministic offline fallback)
+- Automatic **+20% buffer** on weather-sensitive materials when rain is coming
+
+**📈 Usage analytics & anomaly detection**
+- 14-day consumption charts per material with **spike detection** (mean + 2σ) to flag
+  possible waste or theft
+
+**🏢 Multi-site, multi-industry**
+- **Sites** are the operational unit; a **site switcher** scopes every screen
+- **5 industries** shipped end-to-end — Construction, Electrical, Plumbing, HVAC, Painting
+
+**🧠 AI layer** — natural-language insights, AI-proposed budgeting, and site-photo
+vision analysis (see [below](#the-ai-layer-milestone-3)).
+
+**🎨 A UI that doesn't look generic** — a "Blueprint Aurora" construction theme with a
+dusk-skyline + tower-crane hero, scroll-animated landing, and a **per-role themed
+workspace** (Manager = indigo/analytics, Stock = amber/warehouse, Engineer =
+emerald/on-site, Vendor = sky/logistics).
+
+---
+
+## The four roles
 
 A company runs **multiple sites** (each belongs to an industry and owns its own
-stock/procurement). Every role gets a **site switcher** in the top bar.
+stock/procurement). Every role except Vendor gets a **site switcher** in the top bar.
 
 | Role | What they do |
 |------|--------------|
-| **Stock Handler** | Track material levels; log usage/deliveries; **issue** the engineer's material requests; receive purchase orders. |
-| **Manager** | Dashboards, thresholds, weather, anomaly detection, run the auto-procurement engine, approve/reject orders, and watch **site progress**. |
-| **Site Engineer** | Post **daily progress updates** (with blockers, labor, weather impact) and **request materials** for the day. |
-| **Vendor** | Post price + delivery ETA per material; the engine ranks every offer. |
+| 📊 **Manager** | Live dashboards, thresholds, weather, anomaly detection. Run the auto-procurement engine, approve/reject orders, watch site progress — plus the **AI insights, budget forecast, and site-photo reports**. |
+| 📦 **Stock Handler** | Track levels; log usage/deliveries; **issue** the engineer's material requests (draws stock FIFO); receive purchase orders into stock. |
+| 👷 **Site Engineer** | Post **daily progress updates** (progress %, labour, blockers, weather impact), **request materials** for the day, and **upload site photos** for AI analysis. |
+| 🚚 **Vendor** | Post price + delivery ETA per material across every industry; the engine ranks every offer and routes won orders here to accept. |
+
+---
+
+## The AI layer (Milestone 3)
+
+The AI features run on **Claude (`claude-opus-4-8`)** via the official Anthropic SDK.
+Everything **degrades to a deterministic, rule-based engine when no API key is set** —
+so the public demo always works at zero cost, and the dashboard shows a **"Live AI" /
+"Demo"** badge for the active mode. Add a key and the same features run through Claude.
+
+### 🧠 Ask ConstructAI — natural-language insights
+A chat panel on the manager dashboard. Ask things like *"what should I order?"*,
+*"why did cement usage spike?"*, or *"are we on budget?"* and get an answer **grounded
+in that site's live data**, with **source chips** showing what it looked at. With a key,
+it's an **agentic tool-calling loop**: Claude pulls exactly the data it needs (stock,
+vendor offers, weather, labour, spend, progress) before answering — the "contextual RAG"
+is structured tool-calls over the live database, so answers can't hallucinate the numbers.
+
+### 💰 Budget & Forecast — AI proposes, you adjust
+An **AI-proposed budget** that connects vendor prices, labour (daily-update headcount ×
+rate), schedule progress, and **weather risk** into materials / labour / contingency.
+It then tracks **actual spend vs. budget** and forecasts overrun risk
+(*"Overrun risk — projected ₹X exceeds the ₹Y budget at 45% complete; rain may lift
+material costs"*). The manager can **re-propose** or fine-tune the totals.
+
+### 📸 Site-photo vision analysis
+A site engineer uploads a progress photo; Claude **vision** returns a structured report —
+estimated completion %, key observations, **safety flags** (missing PPE / hazards),
+materials visible, and an overall status — which lands in the **manager's photo-reports
+grid**. (Photos are stored in Postgres so they survive the free tier's ephemeral disk.)
+
+> **Turn on live Claude:** set `ANTHROPIC_API_KEY` on the Render service → redeploy. The
+> badge flips to **"Live AI"** and Ask / Budget / Vision all run through Claude. No key =
+> the rule-based demo keeps running for free. (See [DEPLOYMENT.md](DEPLOYMENT.md).)
+
+---
+
+## How the procurement engine works
+
+When a material's **available** stock falls to/below its threshold, the engine
+([`backend/app/services/procurement.py`](backend/app/services/procurement.py)):
+
+1. **Computes the quantity** to order (refill toward target, **+ rain buffer** if the
+   material is weather-sensitive and rain is forecast).
+2. **Scores every active offer** — normalised price and ETA combined with the vendor's
+   rating. The weights shift with urgency:
+   `w_price = 0.6 − 0.4·urgency`, `w_eta = 0.3 + 0.5·urgency` — i.e. when stock is
+   critical, **speed outweighs price**.
+3. **Allocates greedily** across the best offers, so a critical shortfall will buy some
+   from a faster-but-pricier vendor to cover the gap, and writes a human-readable
+   `rationale` on each suggested order.
+
+Everything is unit-tested (urgency curve, scoring, multi-vendor allocation, rain buffer).
+
+---
 
 ## Tech stack
 
-- **Backend:** FastAPI (Python 3.14) · SQLAlchemy · PostgreSQL (psycopg; SQLite also supported) · JWT auth
-- **Frontend:** React 19 + TypeScript · Vite · Tailwind CSS v4 · Recharts · React Router
+| Layer | Tech |
+|-------|------|
+| **Backend** | FastAPI · SQLAlchemy 2.0 · **PostgreSQL** (psycopg; SQLite for tests/dev) · Alembic migrations · Pydantic v2 · JWT (PyJWT) + PBKDF2 hashing |
+| **AI** | Anthropic SDK · **Claude `claude-opus-4-8`** (tool-use agent, structured-output budgeting, vision) with a rule-based no-key fallback |
+| **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS v4 · Recharts · React Router (lazy/code-split) · axios |
+| **Weather** | Open-Meteo (key-less) + offline simulation |
+| **Deploy** | Vercel (frontend) · Render (FastAPI + Postgres, blueprint) · GitHub Actions keep-warm |
+
+---
 
 ## Project structure
 
@@ -48,158 +189,210 @@ stock/procurement). Every role gets a **site switcher** in the top bar.
 ConstructAI/
 ├─ backend/
 │  ├─ app/
-│  │  ├─ main.py          # FastAPI app + CORS + router wiring
-│  │  ├─ config.py        # settings (env / .env)
-│  │  ├─ database.py      # engine + session + Base
-│  │  ├─ models.py        # ORM models (industry-agnostic schema)
-│  │  ├─ schemas.py       # Pydantic request/response contracts
-│  │  ├─ security.py      # password hashing (PBKDF2) + JWT
-│  │  ├─ deps.py          # current-user + role guards
-│  │  ├─ seed.py          # demo data (run with --reset to wipe)
-│  │  ├─ services/        # procurement engine + weather + inventory (batches/FIFO/expiry)
-│  │  └─ routers/         # auth, industries, materials, stock, vendors, procurement, weather
-│  ├─ tests/             # pytest: engine unit tests + API integration tests
-│  ├─ alembic/           # database migrations (run: alembic upgrade head)
+│  │  ├─ main.py            # FastAPI app + CORS + router wiring
+│  │  ├─ config.py          # settings (env / .env), incl. ANTHROPIC_API_KEY
+│  │  ├─ database.py        # engine + session + Base
+│  │  ├─ models.py          # ORM models (industry-agnostic; Budget, SiteImageReport…)
+│  │  ├─ schemas.py         # Pydantic request/response contracts
+│  │  ├─ security.py        # password hashing (PBKDF2) + JWT
+│  │  ├─ deps.py            # current-user + role guards
+│  │  ├─ seed.py            # demo data (run with --reset to wipe)
+│  │  ├─ services/
+│  │  │  ├─ procurement.py  # the auto-reorder engine (scoring + allocation)
+│  │  │  ├─ inventory.py    # batches / FIFO consumption / expiry
+│  │  │  ├─ weather.py      # Open-Meteo + offline simulation
+│  │  │  └─ ai/             # AI layer: client, context (RAG), tools, agent,
+│  │  │                     #   budget, vision, fallback
+│  │  └─ routers/           # auth, industries, sites, materials, stock, vendors,
+│  │                        #   procurement, weather, engineering, ai
+│  ├─ tests/                # pytest — engine, inventory, API lifecycle, AI (34 tests)
+│  ├─ alembic/              # database migrations (alembic upgrade head)
 │  └─ requirements.txt
 └─ frontend/
    └─ src/
-      ├─ api/client.ts        # axios + token handling
-      ├─ auth/AuthContext.tsx  # login / signup / session
-      ├─ hooks/useMaterials.ts
-      ├─ components/           # Layout, ProtectedRoute, UI kit
-      └─ pages/                # Landing, Login, Signup, + 3 dashboards
+      ├─ api/client.ts          # axios + token handling
+      ├─ auth/AuthContext.tsx   # login / signup / session
+      ├─ site/SiteContext.tsx   # multi-site switcher state
+      ├─ components/            # Layout, RoleBackdrop, icons, SitePhotosPanel, UI kit
+      └─ pages/                # Landing, Login, Signup + manager/stock/engineer/vendor
 ```
 
 ---
 
-## Running it
+## Run it locally
 
-You need **Python 3.14**, **Node 18+** (Node 24 tested), and **PostgreSQL**.
+**Prerequisites:** Python 3.12+ · Node 18+ · PostgreSQL (or use SQLite for zero setup).
 
-### 1. Database (PostgreSQL)
-
-Create the database, then point the backend at it via `backend/.env`:
+### 1. Database
 
 ```sql
--- in psql or pgAdmin
+-- in psql / pgAdmin
 CREATE DATABASE constructai;
 ```
 
-```powershell
+```bash
 cd backend
-copy .env.example .env
-# then edit .env and set your password in DATABASE_URL:
-#   postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/constructai
+cp .env.example .env          # then set your password in DATABASE_URL
+#   DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/constructai
+#   (or, zero-setup: DATABASE_URL=sqlite:///./constructai.db)
 ```
 
-> Prefer zero-setup? Set `DATABASE_URL=sqlite:///./constructai.db` in `.env` instead.
+### 2. Backend  *(terminal 1)*
 
-### 2. Backend (terminal 1)
-
-```powershell
+```bash
 cd backend
-python -m venv .venv                 # first time only
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt   # first time only
-.\.venv\Scripts\python.exe -m alembic upgrade head   # create/upgrade the schema (migrations)
-.\.venv\Scripts\python.exe -m app.seed --reset       # load demo data (data only)
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe -m alembic upgrade head      # create/upgrade schema
+.venv/Scripts/python.exe -m app.seed --reset          # load demo data
+.venv/Scripts/python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-API runs at http://localhost:8000 — interactive docs at http://localhost:8000/docs
+API → http://localhost:8000 · interactive docs → http://localhost:8000/docs
 
-### 3. Frontend (terminal 2)
+> **Optional — enable live Claude:** add `ANTHROPIC_API_KEY=sk-ant-...` to `backend/.env`.
+> Without it, the AI features run in rule-based demo mode.
 
-```powershell
+### 3. Frontend  *(terminal 2)*
+
+```bash
 cd frontend
-npm install        # first time only
+npm install
 npm run dev
 ```
 
-Open **http://localhost:5173**
+App → **http://localhost:5173**
 
-### Demo accounts (password: `password123`)
+### Demo accounts  *(password: `password123`)*
 
 | Role | Email |
 |------|-------|
 | Manager | `manager@constructai.dev` |
 | Stock Handler | `stock@constructai.dev` |
 | Site Engineer | `engineer@constructai.dev` |
-| Vendor | `vendor1@constructai.dev` (also vendor2 / vendor3) |
+| Vendor | `vendor1@constructai.dev` (also `vendor2@`, `vendor3@`) |
 
-The login screen has one-click buttons to fill these in.
+The Manager / Stock / Engineer logins roam **every site** via the switcher. The login
+screen has one-click buttons to fill these in.
 
 ### Tests
 
-```powershell
+```bash
 cd backend
-.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt   # first time
-.\.venv\Scripts\python.exe -m pytest
+.venv/Scripts/python.exe -m pip install -r requirements-dev.txt
+.venv/Scripts/python.exe -m pytest
 ```
 
-25 tests: engine unit tests (urgency, scoring, allocation, rain buffer), inventory tests
-(reserve/available, batch FIFO, expiry buckets), and API integration tests (auth, role
-guards, site scoping, the suggest→approve→accept→receive lifecycle, and the site-engineer
-daily-update + material-request → issue flow).
+**34 tests** — engine (urgency, scoring, allocation, rain buffer), inventory
+(reserve/available, batch FIFO, expiry buckets), API lifecycle (auth, role guards, site
+scoping, suggest→approve→accept→receive, engineer daily-update + material-request →
+issue), and the AI layer (status, insights, budgeting, photo upload) on the no-key path.
+
+---
 
 ## Deploy (Vercel + Render)
 
-Frontend → **Vercel**, backend + Postgres → **Render**, both from this repo. It's
-pre-configured ([`render.yaml`](render.yaml), [`frontend/vercel.json`](frontend/vercel.json),
-keep-warm workflow) and **auto-seeds demo data on deploy**. Full step-by-step:
+Frontend → **Vercel**, backend + Postgres → **Render**, both straight from this repo.
+It's pre-wired ([`render.yaml`](render.yaml), [`frontend/vercel.json`](frontend/vercel.json),
+keep-warm workflow) and **auto-migrates + seeds demo data on deploy**. Set
+`ANTHROPIC_API_KEY` on Render to switch the AI from demo to live. Full step-by-step:
 **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+---
+
+## API reference
+
+Interactive OpenAPI docs are at `/docs`. Highlights:
+
+<details>
+<summary><b>Auth, catalog & stock</b></summary>
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/auth/signup`, `/auth/login` | returns a JWT + user |
+| `GET`  | `/auth/me` | current user |
+| `GET`  | `/industries`, `/sites` | catalog (sites filtered to the user) |
+| `GET`/`POST` | `/materials` | per-site materials (incl. reserve & available) |
+| `GET`/`POST` | `/stock/movements` | the ledger; `GET /stock/daily-usage` powers charts |
+| `GET`  | `/stock/batches`, `/stock/expiry` | per-batch expiry tracking |
+</details>
+
+<details>
+<summary><b>Vendors & procurement</b></summary>
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET`/`POST`/`DELETE` | `/vendors/offers` | vendors post/withdraw price + ETA |
+| `POST` | `/procurement/run?site_id=` | run the engine → suggested orders |
+| `GET`  | `/procurement/orders` | role-scoped order list |
+| `POST` | `/procurement/orders/{id}/approve` · `/reject` · `/accept` · `/receive` | lifecycle |
+| `GET`  | `/weather?site_id=` | city forecast + rain advisory |
+</details>
+
+<details>
+<summary><b>Site engineering & AI</b></summary>
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `GET`/`POST` | `/engineering/daily-updates` | progress reports → manager |
+| `GET`/`POST` | `/engineering/material-requests` | + `/{id}/issue`, `/{id}/reject` |
+| `POST` | `/engineering/site-photos` | engineer uploads a photo → AI vision report |
+| `GET`  | `/engineering/site-photos` · `/{id}` | reports list / image detail |
+| `GET`  | `/ai/status` | live-AI vs. demo mode |
+| `POST` | `/ai/ask` | natural-language insight (manager) |
+| `GET`/`POST` | `/ai/budget` · `/ai/budget/propose` | AI-proposed budget + forecast |
+| `PATCH`| `/ai/budget/{id}` | manager adjusts the budget |
+</details>
 
 ---
 
 ## Roadmap
 
-**Milestone 1 — Foundation (done)**
-- [x] Auth + signup/login, 3 role-based dashboards, landing role-chooser
-- [x] Material catalog with per-material thresholds + status (ok / low / critical)
-- [x] Stock movement ledger (usage / delivery / adjustment)
-- [x] Vendor offers (post / withdraw); manager sees all offers
-- [x] Usage analytics + anomaly detection (theft/waste flag)
+**Milestone 1 — Foundation** ✅
+- [x] Auth + role-based dashboards + landing role-chooser
+- [x] Material catalog with thresholds & status, stock ledger, vendor offers
+- [x] Usage analytics + anomaly (theft/waste) detection
 
-**Milestone 2 — Auto-procurement engine (done)**
-- [x] When stock ≤ threshold, score vendor offers (price vs. ETA vs. urgency)
-- [x] Allocate the reorder quantity across vendors (buys some from the fast-but-pricier
-      vendor when critically low)
-- [x] Order lifecycle: manager **approve/reject** → vendor **accepts** → stock handler
-      **receives** (auto stock movement). Vendors see their incoming orders.
-- [x] Hardened: automated tests, code-split bundle, 401 auto-logout, ≥32-byte JWT secret
+**Milestone 2 — Auto-procurement engine** ✅
+- [x] Price-vs-ETA-vs-urgency scoring with multi-vendor allocation
+- [x] Order lifecycle: approve → accept → receive; hardened with tests, code-split, auto-logout
 
-**Weather module (done)**
-- [x] City-wise live forecast (Open-Meteo, key-less; offline simulation fallback)
-- [x] +20% rain buffer applied to weather-sensitive materials during reorder
+**Weather, inventory depth & PostgreSQL** ✅
+- [x] Live city-wise forecast + rain buffer
+- [x] Per-batch **expiry** (FIFO) and **reserve** safety stock
+- [x] Migrated to **PostgreSQL** with **Alembic** migrations
 
-**Inventory depth & PostgreSQL (done)**
-- [x] Migrated to **PostgreSQL** (psycopg); still SQLite-compatible for tests/dev
-- [x] **Per-batch expiry** — deliveries become batches; consumption is FIFO (oldest
-      expiry first); manager sees expired / expiring-soon alerts
-- [x] **Reserve safety stock** — a `reserve_percent` per material held back; status and
-      the engine work off *available* (current − reserved) stock
-- [x] **Alembic migrations** manage the schema (no more auto-create on startup)
-- [x] 21 automated tests covering the above
+**Multi-site, Site Engineer & 5 industries** ✅
+- [x] Sites as the operational unit + top-bar switcher
+- [x] Site Engineer role (daily updates + material requests)
+- [x] Construction, Electrical, Plumbing, HVAC, Painting — each fully built
 
-**Multi-site, Site Engineer & multi-industry (done)**
-- [x] **Sites** are the operational unit — each owns its own stock/procurement; a
-      **site switcher** in the top bar scopes every screen
-- [x] New **Site Engineer** role: daily progress updates (→ manager's Site Progress
-      panel) and material requests (→ stock handler issues, drawing stock down FIFO)
-- [x] **5 industries** fully built — Construction, Electrical, Plumbing, HVAC, and
-      Painting — each with sites, materials, vendors/offers, and demo activity. The
-      demo manager/stock/engineer logins roam every site via the switcher.
-- [x] 25 automated tests; data migrations preserve existing rows
+**Milestone 3 — AI layer** ✅
+- [x] **Phase 1** — agentic natural-language insights (contextual RAG over live data) +
+      AI-proposed budgeting that links procurement, labour & weather
+- [x] **Phase 2** — site-photo **vision** analysis (progress %, safety flags, materials)
+- [x] No-key rule-based fallback so the demo runs free; one switch flips it to live Claude
 
-**Milestone 3 — AI layer (next)**
-- [ ] Agents to interlink procurement with budgeting & scheduling; contextual RAG
-- [ ] Natural-language insights ("why did cement spike?", "what should I order?")
+**Future ideas**
+- [ ] Vector RAG over notes & daily updates
+- [ ] An agent that auto-drafts purchase orders for approval
+- [ ] In-app labour-rate config and schedule milestones
 
 ---
 
-## Notes
+## Configuration & notes
 
-- Configure the database via `backend/.env` (`DATABASE_URL`). **Schema is managed by
-  Alembic** — after editing models, run `alembic revision --autogenerate -m "..."` then
-  `alembic upgrade head`. `python -m app.seed --reset` resets the demo **data** only.
-- `SECRET_KEY` defaults to a dev value — set a real one via `backend/.env`
-  (copy `.env.example`) before any real deployment.
+- **Database** is configured via `backend/.env` (`DATABASE_URL`). The schema is managed
+  by **Alembic** — after editing models run
+  `alembic revision --autogenerate -m "..."` then `alembic upgrade head`.
+  `python -m app.seed --reset` resets demo **data** only.
+- **Secrets:** `SECRET_KEY` defaults to a dev value — set a real one in `.env` before any
+  real deployment. `ANTHROPIC_API_KEY` is optional (enables live Claude). Neither is
+  committed.
+- **Local dev** built on Python 3.14; Render pins Python 3.12.6 (the app supports 3.12+).
+
+<div align="center">
+
+**[▶ Live demo](https://construct-ai-eosin.vercel.app)** · Built with FastAPI, React & Claude
+
+</div>
