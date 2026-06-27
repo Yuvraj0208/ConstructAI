@@ -13,6 +13,7 @@ from .routers import (
     engineering,
     industries,
     materials,
+    portfolio,
     procurement,
     schedule,
     sites,
@@ -56,6 +57,7 @@ app.include_router(weather.router)
 app.include_router(engineering.router)
 app.include_router(ai.router)
 app.include_router(schedule.router)
+app.include_router(portfolio.router)
 
 
 @app.get("/", tags=["health"])

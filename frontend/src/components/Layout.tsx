@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useSite } from '../site/SiteContext';
 import { ROLE_LABELS } from '../types';
@@ -60,6 +61,14 @@ export function Layout({
 
           {/* Controls — each item is shrink-protected so they can never overlap */}
           <div className="flex min-w-0 items-center gap-2">
+            {role === 'manager' && (
+              <Link
+                to="/app/portfolio"
+                className="hidden shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-white sm:inline-flex"
+              >
+                <Icon name="layers" className="h-4 w-4" /> Portfolio
+              </Link>
+            )}
             {sites.length > 0 && (
               <label className="inline-flex min-w-0 max-w-[11rem] shrink items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-2.5 py-1.5 shadow-sm transition focus-within:border-indigo-300 hover:border-indigo-300 sm:max-w-[15rem]">
                 <Icon name="mapPin" className={`h-4 w-4 shrink-0 ${theme.accentText}`} />

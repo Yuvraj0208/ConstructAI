@@ -13,6 +13,7 @@ const ManagerDashboard = lazy(() => import('./pages/manager/ManagerDashboard'));
 const StockDashboard = lazy(() => import('./pages/stock/StockDashboard'));
 const VendorDashboard = lazy(() => import('./pages/vendor/VendorDashboard'));
 const SiteEngineerDashboard = lazy(() => import('./pages/engineer/SiteEngineerDashboard'));
+const PortfolioPage = lazy(() => import('./pages/manager/PortfolioPage'));
 
 /** Send logged-in users straight to their dashboard; everyone else sees Landing. */
 function HomeRoute() {
@@ -39,6 +40,14 @@ export default function App() {
         element={
           <ProtectedRoute role="manager">
             <ManagerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/portfolio"
+        element={
+          <ProtectedRoute role="manager">
+            <PortfolioPage />
           </ProtectedRoute>
         }
       />

@@ -432,3 +432,40 @@ class MilestoneOut(BaseModel):
     status: str
     sort_order: int
     created_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Multi-site portfolio rollup (executive overview)
+# --------------------------------------------------------------------------- #
+class PortfolioSiteOut(BaseModel):
+    id: int
+    name: str
+    city: str | None = None
+    industry_id: int
+    materials_total: int
+    low: int
+    critical: int
+    latest_progress: float | None = None
+    milestones_overdue: int
+    milestones_at_risk: int
+    spend_total: float
+    committed: float
+    budget_total: float | None = None
+    utilization_percent: float | None = None
+    on_track: bool | None = None
+    needs_attention: bool
+
+
+class PortfolioTotals(BaseModel):
+    sites: int
+    critical: int
+    low: int
+    spend_total: float
+    budget_total: float
+    sites_need_attention: int
+
+
+class PortfolioOut(BaseModel):
+    sites: list[PortfolioSiteOut] = []
+    totals: PortfolioTotals
+    insight: str

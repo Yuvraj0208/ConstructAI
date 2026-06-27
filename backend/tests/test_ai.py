@@ -227,3 +227,22 @@ def test_engineer_can_mark_milestone_done(client, seed_data):
     res = client.patch(f"/schedule/milestones/{mid}", json={"status": "done"}, headers=eng)
     assert res.status_code == 200, res.text
     assert res.json()["status"] == "done"
+
+
+# --- Multi-site portfolio rollup ---
+def test_portfolio_rollup(client, seed_data):
+    mgr = login(client, "manager@test.dev")
+    res = client.get("/portfolio", headers=mgr)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["totals"]["sites"] >= 1
+    site = next((s for s in body["sites"] if s["name"] == "Test Site"), None)
+    assert site is not None
+    assert site["low"] >= 1  # seeded cement is low (80/100)
+    assert body["insight"]
+
+
+def test_portfolio_requires_manager(client, seed_data):
+    stock = login(client, "stock@test.dev")
+    res = client.get("/portfolio", headers=stock)
+    assert res.status_code == 403, res.text

@@ -278,3 +278,37 @@ export interface Milestone {
   sort_order: number;
   created_at: string;
 }
+
+export interface PortfolioSite {
+  id: number;
+  name: string;
+  city?: string | null;
+  industry_id: number;
+  materials_total: number;
+  low: number;
+  critical: number;
+  latest_progress?: number | null;
+  milestones_overdue: number;
+  milestones_at_risk: number;
+  spend_total: number;
+  committed: number;
+  budget_total?: number | null;
+  utilization_percent?: number | null;
+  on_track?: boolean | null;
+  needs_attention: boolean;
+}
+
+export interface PortfolioTotals {
+  sites: number;
+  critical: number;
+  low: number;
+  spend_total: number;
+  budget_total: number;
+  sites_need_attention: number;
+}
+
+export interface Portfolio {
+  sites: PortfolioSite[];
+  totals: PortfolioTotals;
+  insight: string;
+}
