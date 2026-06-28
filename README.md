@@ -128,10 +128,11 @@ stock/procurement). Every role except Vendor gets a **site switcher** in the top
 
 ## The AI layer (Milestone 3)
 
-The AI features run on **Claude (`claude-opus-4-8`)** via the official Anthropic SDK.
-Everything **degrades to a deterministic, rule-based engine when no API key is set** —
-so the public demo always works at zero cost, and the dashboard shows a **"Live AI" /
-"Demo"** badge for the active mode. Add a key and the same features run through Claude.
+The AI features run on a **pluggable LLM provider** — pick one with `AI_PROVIDER`:
+**Ollama** (local & free, no key), **Claude**, or any **OpenAI-compatible** host (OpenAI,
+Groq, OpenRouter…). Everything **degrades to a deterministic, rule-based engine when no
+provider is configured** — so the public demo always works at zero cost, and the dashboard
+shows a **"Live AI" / "Demo"** badge. Pick a provider and the same features run through it.
 
 ### 🧠 Ask ConstructAI — natural-language insights
 A chat panel on the manager dashboard. Ask things like *"what should I order?"*,
@@ -170,9 +171,11 @@ Per-site milestones with **overdue / at-risk** tracking. The AI folds schedule r
 answers (*"Phase 2 overdue by 4 days"*); the labour rate that drives the budget is editable
 inline.
 
-> **Turn on live Claude:** set `ANTHROPIC_API_KEY` on the Render service → redeploy. The
-> badge flips to **"Live AI"** and Ask / Budget / Vision all run through Claude. No key =
-> the rule-based demo keeps running for free. (See [DEPLOYMENT.md](DEPLOYMENT.md).)
+> **Turn on real AI:** for **free & local**, install [Ollama](https://ollama.com), pull
+> `llama3.1` + `llama3.2-vision`, and run the backend with `AI_PROVIDER=ollama` — no key, no
+> per-call cost (great for dev; it can't run on Render's free tier, so the hosted demo stays
+> on the fallback). For a **hosted** model, set `AI_PROVIDER=anthropic`/`openai` + the key.
+> No provider = the rule-based demo keeps running for free. (See [DEPLOYMENT.md](DEPLOYMENT.md).)
 
 ---
 
@@ -200,7 +203,7 @@ Everything is unit-tested (urgency curve, scoring, multi-vendor allocation, rain
 | Layer | Tech |
 |-------|------|
 | **Backend** | FastAPI · SQLAlchemy 2.0 · **PostgreSQL** (psycopg; SQLite for tests/dev) · Alembic migrations · Pydantic v2 · JWT (PyJWT) + PBKDF2 hashing |
-| **AI** | Anthropic SDK · **Claude `claude-opus-4-8`** (tool-use agent, structured-output budgeting, vision) with a rule-based no-key fallback |
+| **AI** | Pluggable provider — **Ollama** (local/free), **Claude**, or any **OpenAI-compatible** host (tool-use agent, structured-output budgeting, vision) with a rule-based no-key fallback |
 | **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS v4 · Recharts · React Router (lazy/code-split) · axios |
 | **Weather** | Open-Meteo (key-less) + offline simulation |
 | **Deploy** | Vercel (frontend) · Render (FastAPI + Postgres, blueprint) · GitHub Actions keep-warm |

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from ...config import settings
 from ...models import Budget, PurchaseOrder, Site, VendorOffer
 from . import context
-from .client import ai_enabled, get_client
+from .provider import ai_enabled, get_provider
 
 _TURNOVER = 3.0  # materials are bought & consumed a few times over a project
 _DEFAULT_PROJECT_DAYS = 180
@@ -101,26 +101,20 @@ def _heuristic_budget(db: Session, site: Site) -> dict:
     }
 
 
-def _claude_budget(client, db: Session, site: Site, baseline: dict) -> dict:
+def _ai_budget(provider, db: Session, site: Site, baseline: dict) -> dict:
     ctx = context.full_context(db, site, settings.labor_rate_per_worker_day)
     prompt = (
-        "You are a construction cost estimator. Propose a realistic TOTAL project "
-        "budget for this site, split into materials, labour and contingency (₹). "
-        "Connect vendor prices, current stock, labour headcount, schedule progress "
-        "and weather risk. Here is the live data:\n\n"
+        "Propose a realistic TOTAL project budget for this site, split into "
+        "materials, labour and contingency (₹). Connect vendor prices, current "
+        "stock, labour headcount, schedule progress and weather risk. Live data:\n\n"
         f"{json.dumps(ctx, default=str)}\n\n"
         f"A rule-based baseline for reference: {json.dumps(baseline, default=str)}\n\n"
         "Return materials_amount, labour_amount, contingency_amount and a one-sentence "
         "rationale that names the main drivers."
     )
-    response = client.messages.create(
-        model=settings.ai_model,
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={"format": {"type": "json_schema", "schema": _BUDGET_SCHEMA}},
+    data = provider.complete_json(
+        system="You are a construction cost estimator.", user_text=prompt, schema=_BUDGET_SCHEMA
     )
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    data = json.loads(text)
     m = max(0.0, float(data["materials_amount"]))
     l = max(0.0, float(data["labour_amount"]))
     c = max(0.0, float(data["contingency_amount"]))
@@ -136,13 +130,13 @@ def _claude_budget(client, db: Session, site: Site, baseline: dict) -> dict:
 
 
 def propose_budget(db: Session, site: Site) -> dict:
-    """An AI-proposed budget (Claude when configured, else the heuristic)."""
+    """An AI-proposed budget (the configured provider, else the heuristic)."""
     baseline = _heuristic_budget(db, site)
-    client = get_client()
-    if client is None:
+    provider = get_provider()
+    if provider is None:
         return baseline
     try:
-        return _claude_budget(client, db, site, baseline)
+        return _ai_budget(provider, db, site, baseline)
     except Exception:
         return baseline
 

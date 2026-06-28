@@ -13,12 +13,11 @@ import json
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ...config import settings
 from ...models import Budget, POStatus, PurchaseOrder, Site, VendorOffer
 from ..procurement import compute_urgency, generate_suggestions, score_offers
 from . import context
 from .budget import build_forecast
-from .client import get_client
+from .provider import get_provider
 
 _DRAFT_SCHEMA = {
     "type": "object",
@@ -101,19 +100,19 @@ def _clear_stale(db: Session, material_ids: list[int]) -> None:
 
 
 def draft_orders(db: Session, site: Site) -> list[PurchaseOrder]:
-    """Draft SUGGESTED purchase orders. Claude when configured, else the engine."""
-    client = get_client()
-    if client is None:
+    """Draft SUGGESTED purchase orders. The configured provider, else the engine."""
+    provider = get_provider()
+    if provider is None:
         created, _weather, _advisory = generate_suggestions(db, site)
         return created
     try:
-        return _claude_draft(client, db, site)
+        return _ai_draft(provider, db, site)
     except Exception:
         created, _weather, _advisory = generate_suggestions(db, site)
         return created
 
 
-def _claude_draft(client, db: Session, site: Site) -> list[PurchaseOrder]:
+def _ai_draft(provider, db: Session, site: Site) -> list[PurchaseOrder]:
     cands, offer_map = _candidates(db, site)
     if not cands:
         return []
@@ -126,26 +125,22 @@ def _claude_draft(client, db: Session, site: Site) -> list[PurchaseOrder]:
     weather = context.weather(site)
 
     prompt = (
-        "You are a procurement officer drafting purchase orders for a site manager to "
-        "approve. For each material below, choose the best vendor offer and a sensible "
-        "quantity (around suggested_quantity, adjusted for urgency, recent usage and "
-        "weather). You may skip a material. Pick ONLY from the given offer_ids — never "
-        "invent vendors or prices. Stay within the remaining budget where reasonable; if a "
-        "critical material would exceed it, still order what's needed and say so.\n\n"
+        "Draft purchase orders for a site manager to approve. For each material below, "
+        "choose the best vendor offer and a sensible quantity (around suggested_quantity, "
+        "adjusted for urgency, recent usage and weather). You may skip a material. Pick "
+        "ONLY from the given offer_ids — never invent vendors or prices. Stay within the "
+        "remaining budget where reasonable; if a critical material would exceed it, still "
+        "order what's needed and say so.\n\n"
         f"Remaining budget (INR): {remaining}\n"
         f"Weather: {'rain expected' if weather.get('will_rain') else 'clear'}\n"
         f"Materials & offers:\n{json.dumps(cands, default=str)}\n"
         f"Recent usage:\n{json.dumps(context.usage_trends(db, site), default=str)}\n\n"
         "Return an `orders` array of {material_id, offer_id, quantity, reason}."
     )
-    response = client.messages.create(
-        model=settings.ai_model,
-        max_tokens=1500,
-        messages=[{"role": "user", "content": prompt}],
-        output_config={"format": {"type": "json_schema", "schema": _DRAFT_SCHEMA}},
+    data = provider.complete_json(
+        system="You are a procurement officer.", user_text=prompt, schema=_DRAFT_SCHEMA
     )
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    picks = json.loads(text).get("orders", [])
+    picks = data.get("orders", [])
 
     _clear_stale(db, [c["material_id"] for c in cands])
     created: list[PurchaseOrder] = []

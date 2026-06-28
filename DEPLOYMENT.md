@@ -42,14 +42,24 @@ intervals is even more reliable.)
 > **Truly zero delay** needs an always-on instance — upgrade the Render service to the
 > Starter plan (~$7/mo) and it never sleeps. The Vercel frontend is always instant.
 
-## 4. AI features (optional — live Claude)
+## 4. AI provider (optional)
 
-The manager dashboard's **Ask ConstructAI** and **Budget & Forecast** run on a built-in
-rule-based engine by default, so the demo works with zero setup and zero cost. To switch
-them to live Claude, add your Anthropic API key on the Render service: **Environment → Add
-Environment Variable** → `ANTHROPIC_API_KEY` = your key (from
-https://console.anthropic.com), then redeploy. Leave it unset to keep the free demo
-running. The dashboard shows a **"Live AI" / "Demo"** badge for the active mode.
+The AI features (Ask ConstructAI, Budget, AI draft orders, photo vision) run on a built-in
+**rule-based fallback** by default — zero setup, zero cost — and the dashboard shows a
+**"Live AI" / "Demo"** badge. To switch to a real model, set `AI_PROVIDER` plus its settings:
+
+- **Free & local — Ollama** *(best for development / self-hosting; no API bill)*: install
+  [Ollama](https://ollama.com), then `ollama pull llama3.1` and `ollama pull llama3.2-vision`,
+  and run the backend with `AI_PROVIDER=ollama`. No key, no per-call cost. ⚠️ Ollama needs real
+  RAM/GPU, so it **can't run on Render's free tier** — use it locally, or self-host the backend
+  on a machine that runs Ollama.
+- **Paid / hosted — Claude, OpenAI, Groq, OpenRouter…** *(works on Render)*: set
+  `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`, **or** `AI_PROVIDER=openai` + `OPENAI_API_KEY`
+  (add `OPENAI_BASE_URL` to point at any OpenAI-compatible host). Add them under the service's
+  **Environment** tab → redeploy.
+
+Every variable is documented in [`backend/.env.example`](backend/.env.example). Any provider
+error (bad key, model offline, malformed output) **silently degrades to the rule-based fallback**.
 
 ## 5. Field app (mobile PWA) — optional
 

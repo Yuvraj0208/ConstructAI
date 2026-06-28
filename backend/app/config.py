@@ -14,10 +14,29 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 1 day
 
-    # AI layer (optional). When ANTHROPIC_API_KEY is unset, the AI endpoints fall
-    # back to a deterministic rule-based engine so the live demo keeps working.
+    # ----- AI layer (optional) -----
+    # Pick the LLM provider. When none is configured, every AI feature falls back
+    # to a deterministic rule-based engine, so the app works with zero setup/cost.
+    #   AI_PROVIDER = "" (auto from keys / fallback) | "anthropic" | "openai" | "ollama"
+    ai_provider: str = ""
+
+    # Anthropic (Claude)
     anthropic_api_key: str | None = None
     ai_model: str = "claude-opus-4-8"
+
+    # OpenAI-compatible — works for OpenAI, Groq, OpenRouter, Gemini's compat
+    # endpoint, etc. Set OPENAI_BASE_URL to point at a different host.
+    openai_api_key: str | None = None
+    openai_base_url: str | None = None
+    openai_model: str = "gpt-4o"
+    openai_vision_model: str = "gpt-4o"
+
+    # Ollama — a LOCAL, free, OpenAI-compatible server (runs on your own machine,
+    # no API key, no per-call cost). Pull a tool-capable model + a vision model.
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "llama3.1"
+    ollama_vision_model: str = "llama3.2-vision"
+
     # Default labour cost per worker-day (₹) used for budget & spend estimates.
     labor_rate_per_worker_day: float = 1200.0
 

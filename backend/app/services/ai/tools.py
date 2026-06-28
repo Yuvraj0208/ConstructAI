@@ -30,8 +30,10 @@ _TOOLSPEC = [
     ("search_site_notes", "Field notes", "Keyword-search the site's free-text history (daily updates, material requests, PO rationales, stock notes, photo reports) to recall what happened — e.g. why a material's usage changed.", _QUERY_ARGS),
 ]
 
-# Claude tool schemas
-TOOLS = [{"name": name, "description": desc, "input_schema": schema} for name, _l, desc, schema in _TOOLSPEC]
+# Provider-neutral tool specs: {name, description, parameters(JSON schema)}.
+# Each provider maps these to its own tool format (Anthropic input_schema /
+# OpenAI function.parameters).
+TOOLS_SPEC = [{"name": name, "description": desc, "parameters": schema} for name, _l, desc, schema in _TOOLSPEC]
 
 SOURCE_LABELS = {name: label for name, label, _desc, _schema in _TOOLSPEC}
 

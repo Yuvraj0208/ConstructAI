@@ -7,11 +7,7 @@ shown, and real analysis switches on the moment a key is added.
 """
 from __future__ import annotations
 
-import base64
-import json
-
-from ...config import settings
-from .client import get_client
+from .provider import get_provider
 
 _VISION_SCHEMA = {
     "type": "object",
@@ -54,8 +50,8 @@ _PROMPT = (
 def _fallback_report() -> dict:
     return {
         "progress_estimate": None,
-        "summary": "Photo received. Turn on live AI (set ANTHROPIC_API_KEY) for an automatic "
-        "progress and safety assessment.",
+        "summary": "Photo received. Configure an AI provider (a local Ollama vision model, "
+        "or an API key) for an automatic progress and safety assessment.",
         "observations": [],
         "safety_flags": [],
         "materials_visible": [],
@@ -64,27 +60,14 @@ def _fallback_report() -> dict:
     }
 
 
-def _claude_vision(client, image_bytes: bytes, media_type: str) -> dict:
-    b64 = base64.standard_b64encode(image_bytes).decode("ascii")
-    response = client.messages.create(
-        model=settings.ai_model,
-        max_tokens=1024,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": media_type, "data": b64},
-                    },
-                    {"type": "text", "text": _PROMPT},
-                ],
-            }
-        ],
-        output_config={"format": {"type": "json_schema", "schema": _VISION_SCHEMA}},
+def _ai_vision(provider, image_bytes: bytes, media_type: str) -> dict:
+    data = provider.complete_vision_json(
+        system="You are a construction site supervisor.",
+        user_text=_PROMPT,
+        image_bytes=image_bytes,
+        media_type=media_type,
+        schema=_VISION_SCHEMA,
     )
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    data = json.loads(text)
     pe = data.get("progress_estimate")
     return {
         "progress_estimate": max(0.0, min(100.0, float(pe))) if pe is not None else None,
@@ -99,10 +82,10 @@ def _claude_vision(client, image_bytes: bytes, media_type: str) -> dict:
 
 def analyze_site_image(image_bytes: bytes, media_type: str) -> dict:
     """Return a structured report dict. Never raises — degrades to a placeholder."""
-    client = get_client()
-    if client is None:
+    provider = get_provider()
+    if provider is None:
         return _fallback_report()
     try:
-        return _claude_vision(client, image_bytes, media_type)
+        return _ai_vision(provider, image_bytes, media_type)
     except Exception:
         return _fallback_report()

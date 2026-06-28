@@ -52,9 +52,11 @@ def client(db_session, monkeypatch):
     monkeypatch.setattr("app.services.procurement.get_forecast", lambda *a, **k: FIXED_WEATHER)
     monkeypatch.setattr("app.routers.weather.get_forecast", lambda *a, **k: FIXED_WEATHER)
     monkeypatch.setattr("app.services.ai.context.get_forecast", lambda *a, **k: FIXED_WEATHER)
-    # Force the AI layer onto its rule-based fallback regardless of any
-    # ANTHROPIC_API_KEY present in the developer's environment.
+    # Force the AI layer onto its rule-based fallback regardless of any provider
+    # keys present in the developer's environment.
     monkeypatch.setattr("app.config.settings.anthropic_api_key", None)
+    monkeypatch.setattr("app.config.settings.openai_api_key", None)
+    monkeypatch.setattr("app.config.settings.ai_provider", "")
 
     def override_get_db():
         yield db_session
