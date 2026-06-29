@@ -56,6 +56,7 @@ def client(db_session, monkeypatch):
     # keys present in the developer's environment.
     monkeypatch.setattr("app.config.settings.anthropic_api_key", None)
     monkeypatch.setattr("app.config.settings.openai_api_key", None)
+    monkeypatch.setattr("app.config.settings.gemini_api_key", None)
     monkeypatch.setattr("app.config.settings.ai_provider", "")
 
     def override_get_db():

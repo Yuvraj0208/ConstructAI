@@ -205,6 +205,9 @@ class _OpenAICompatProvider:
         return _lenient_json(resp.choices[0].message.content or "")
 
 
+# Gemini's OpenAI-compatible endpoint (free tier, multimodal).
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
 _cache: dict[Any, Any] = {}
 
 
@@ -213,6 +216,8 @@ def _resolve():
     if not provider:  # auto-detect from configured keys
         if settings.anthropic_api_key:
             provider = "anthropic"
+        elif settings.gemini_api_key:
+            provider = "gemini"
         elif settings.openai_api_key:
             provider = "openai"
 
@@ -220,6 +225,13 @@ def _resolve():
         return _OpenAICompatProvider(
             base_url=settings.ollama_base_url, api_key="ollama",
             model=settings.ollama_model, vision_model=settings.ollama_vision_model,
+        )
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            return None
+        return _OpenAICompatProvider(
+            base_url=_GEMINI_BASE_URL, api_key=settings.gemini_api_key,
+            model=settings.gemini_model, vision_model=settings.gemini_model,
         )
     if provider == "openai":
         return _OpenAICompatProvider(
@@ -241,6 +253,8 @@ def get_provider():
         settings.openai_base_url,
         settings.openai_model,
         settings.openai_vision_model,
+        settings.gemini_api_key,
+        settings.gemini_model,
         settings.ollama_base_url,
         settings.ollama_model,
         settings.ollama_vision_model,

@@ -53,6 +53,11 @@ The AI features (Ask ConstructAI, Budget, AI draft orders, photo vision) run on 
   and run the backend with `AI_PROVIDER=ollama`. No key, no per-call cost. ⚠️ Ollama needs real
   RAM/GPU, so it **can't run on Render's free tier** — use it locally, or self-host the backend
   on a machine that runs Ollama.
+- **Free & hosted — Google Gemini** *(best for the live Render demo)*: grab a free key at
+  [aistudio.google.com](https://aistudio.google.com), then on the Render service set
+  `AI_PROVIDER=gemini` and `GEMINI_API_KEY=...` (optionally `GEMINI_MODEL`) → redeploy. It's a
+  free, rate-limited tier (no card) and **multimodal — so photo analysis works too**. This is
+  the only way to get real AI (incl. vision) on the **hosted** site without paying.
 - **Paid / hosted — Claude, OpenAI, Groq, OpenRouter…** *(works on Render)*: set
   `AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY`, **or** `AI_PROVIDER=openai` + `OPENAI_API_KEY`
   (add `OPENAI_BASE_URL` to point at any OpenAI-compatible host). Add them under the service's

@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     openai_vision_model: str = "gpt-4o"
 
+    # Google Gemini — has a genuinely FREE tier (rate-limited, no card) and is
+    # multimodal, so it works on hosted servers (Render). Set AI_PROVIDER=gemini
+    # and just GEMINI_API_KEY (from https://aistudio.google.com). Uses Gemini's
+    # OpenAI-compatible endpoint under the hood.
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.0-flash"
+
     # Ollama — a LOCAL, free, OpenAI-compatible server (runs on your own machine,
     # no API key, no per-call cost). Pull a tool-capable model + a vision model.
     ollama_base_url: str = "http://localhost:11434/v1"

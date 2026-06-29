@@ -143,6 +143,7 @@ All four AI features run on whichever backend you choose with **`AI_PROVIDER`** 
 |---|---|---|---|
 | *(unset)* | **Rule-based fallback** | Free | Deterministic engine — the default; nothing to install |
 | `ollama` | **Local Ollama** | **Free** | Runs on your own machine: `llama3.1` (Ask / budget / draft orders) + `moondream` (photo vision). No key, no cloud, no per-call cost |
+| `gemini` | **Google Gemini** | **Free tier** | Hosted + multimodal → works on Render. `GEMINI_API_KEY` from [aistudio.google.com](https://aistudio.google.com) (rate-limited, no card) |
 | `anthropic` | **Claude** | Paid | `ANTHROPIC_API_KEY` |
 | `openai` | **OpenAI · Groq · OpenRouter · …** | Paid | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for any OpenAI-compatible host) |
 
