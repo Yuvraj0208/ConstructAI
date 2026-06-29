@@ -7,7 +7,11 @@ shown, and real analysis switches on the moment a key is added.
 """
 from __future__ import annotations
 
+import logging
+
 from .provider import get_provider
+
+_log = logging.getLogger("constructai.ai")
 
 _VISION_SCHEMA = {
     "type": "object",
@@ -68,10 +72,15 @@ def _ai_vision(provider, image_bytes: bytes, media_type: str) -> dict:
         media_type=media_type,
         schema=_VISION_SCHEMA,
     )
+    # A small model may just describe the image (no JSON). That's fine — the
+    # description becomes the summary. Only treat a truly empty reply as a failure.
+    summary = str(data.get("summary") or "").strip()
+    if not summary:
+        raise ValueError("vision model returned an empty response")
     pe = data.get("progress_estimate")
     return {
         "progress_estimate": max(0.0, min(100.0, float(pe))) if pe is not None else None,
-        "summary": str(data.get("summary") or ""),
+        "summary": summary,
         "observations": [str(x) for x in data.get("observations", [])],
         "safety_flags": [str(x) for x in data.get("safety_flags", [])],
         "materials_visible": [str(x) for x in data.get("materials_visible", [])],
@@ -87,5 +96,6 @@ def analyze_site_image(image_bytes: bytes, media_type: str) -> dict:
         return _fallback_report()
     try:
         return _ai_vision(provider, image_bytes, media_type)
-    except Exception:
+    except Exception as e:
+        _log.warning("Vision analysis failed (%s); saving the placeholder report", e)
         return _fallback_report()

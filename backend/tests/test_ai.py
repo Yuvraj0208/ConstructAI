@@ -92,7 +92,7 @@ def test_engineer_uploads_photo_and_manager_sees_report(client, seed_data):
     body = up.json()
     assert body["used_ai"] is False  # no key -> placeholder report
     assert body["status"] == "pending"
-    assert body["image_data_url"].startswith("data:image/png;base64,")
+    assert body["image_data_url"].startswith("data:image/")
     report_id = body["id"]
 
     # Manager can list reports and fetch the image detail.
@@ -105,7 +105,7 @@ def test_engineer_uploads_photo_and_manager_sees_report(client, seed_data):
 
     detail = client.get(f"/engineering/site-photos/{report_id}", headers=mgr)
     assert detail.status_code == 200
-    assert detail.json()["image_data_url"].startswith("data:image/png;base64,")
+    assert detail.json()["image_data_url"].startswith("data:image/")
 
 
 def test_photo_upload_requires_engineer(client, seed_data):

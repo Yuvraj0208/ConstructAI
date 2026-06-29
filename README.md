@@ -134,6 +134,24 @@ Groq, OpenRouter…). Everything **degrades to a deterministic, rule-based engin
 provider is configured** — so the public demo always works at zero cost, and the dashboard
 shows a **"Live AI" / "Demo"** badge. Pick a provider and the same features run through it.
 
+### 🔀 Pluggable provider & graceful fallback
+All four AI features run on whichever backend you choose with **`AI_PROVIDER`** — and a single
+[`provider.py`](backend/app/services/ai/provider.py) adapts each one's API (Anthropic's
+`messages` vs. the OpenAI `chat` format):
+
+| `AI_PROVIDER` | Backend | Cost | Notes |
+|---|---|---|---|
+| *(unset)* | **Rule-based fallback** | Free | Deterministic engine — the default; nothing to install |
+| `ollama` | **Local Ollama** | **Free** | Runs on your own machine: `llama3.1` (Ask / budget / draft orders) + `moondream` (photo vision). No key, no cloud, no per-call cost |
+| `anthropic` | **Claude** | Paid | `ANTHROPIC_API_KEY` |
+| `openai` | **OpenAI · Groq · OpenRouter · …** | Paid | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for any OpenAI-compatible host) |
+
+**Every call is wrapped so any failure — missing key, model offline, malformed output —
+silently degrades to the rule-based engine.** That's why the hosted demo always works with no
+provider, and why a tiny local model that merely *describes* a photo still yields a usable
+report. Uploaded photos are auto-converted to JPEG so any format (incl. WebP/HEIC) works with
+local vision models.
+
 ### 🧠 Ask ConstructAI — natural-language insights
 A chat panel on the manager dashboard. Ask things like *"what should I order?"*,
 *"why did cement usage spike?"*, or *"are we on budget?"* and get an answer **grounded

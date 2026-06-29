@@ -236,6 +236,25 @@ def reject_material_request(
 MAX_IMAGE_BYTES = 6 * 1024 * 1024  # 6 MB (stored base64 in Postgres)
 
 
+def _normalize_image(data: bytes, media_type: str) -> tuple[bytes, str]:
+    """Re-encode any uploaded image as JPEG so the vision model can read it —
+    local models via Ollama can't decode WebP/HEIC. Best-effort: on any failure
+    the original bytes/type are kept unchanged."""
+    try:
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(data))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return buf.getvalue(), "image/jpeg"
+    except Exception:
+        return data, media_type
+
+
 def _photo_to_out(r: SiteImageReport, author_name: str | None) -> SiteImageReportOut:
     return SiteImageReportOut(
         id=r.id,
@@ -283,6 +302,8 @@ def upload_site_photo(
     if len(data) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail="Image too large (max 6 MB).")
 
+    # Normalise to JPEG so any format (incl. webp/heic) works with the vision model.
+    data, media_type = _normalize_image(data, media_type)
     report = analyze_site_image(data, media_type)
     row = SiteImageReport(
         site_id=site_id,

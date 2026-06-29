@@ -8,6 +8,7 @@ heuristic produces the same shape. `build_forecast` compares it to actual spend.
 from __future__ import annotations
 
 import json
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,6 +17,8 @@ from ...config import settings
 from ...models import Budget, PurchaseOrder, Site, VendorOffer
 from . import context
 from .provider import ai_enabled, get_provider
+
+_log = logging.getLogger("constructai.ai")
 
 _TURNOVER = 3.0  # materials are bought & consumed a few times over a project
 _DEFAULT_PROJECT_DAYS = 180
@@ -137,7 +140,8 @@ def propose_budget(db: Session, site: Site) -> dict:
         return baseline
     try:
         return _ai_budget(provider, db, site, baseline)
-    except Exception:
+    except Exception as e:
+        _log.warning("AI budget proposal failed (%s); using the heuristic", e)
         return baseline
 
 

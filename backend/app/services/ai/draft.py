@@ -9,6 +9,7 @@ falls back to the deterministic auto-procurement engine.
 from __future__ import annotations
 
 import json
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +19,8 @@ from ..procurement import compute_urgency, generate_suggestions, score_offers
 from . import context
 from .budget import build_forecast
 from .provider import get_provider
+
+_log = logging.getLogger("constructai.ai")
 
 _DRAFT_SCHEMA = {
     "type": "object",
@@ -107,7 +110,8 @@ def draft_orders(db: Session, site: Site) -> list[PurchaseOrder]:
         return created
     try:
         return _ai_draft(provider, db, site)
-    except Exception:
+    except Exception as e:
+        _log.warning("AI draft-orders failed (%s); using the rule-based engine", e)
         created, _weather, _advisory = generate_suggestions(db, site)
         return created
 

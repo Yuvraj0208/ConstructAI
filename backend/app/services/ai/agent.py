@@ -7,6 +7,8 @@ provider configured it degrades to the deterministic rule-based answer.
 """
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session
 
 from ...config import settings
@@ -14,6 +16,8 @@ from ...models import Site
 from . import fallback
 from .provider import get_provider
 from .tools import SOURCE_LABELS, TOOLS_SPEC, run_tool
+
+_log = logging.getLogger("constructai.ai")
 
 _SYSTEM = (
     "You are ConstructAI, the procurement and budgeting analyst for a construction "
@@ -44,8 +48,9 @@ def ask(db: Session, site: Site, question: str) -> dict:
         if not answer.strip():
             return fallback.answer(db, site, question)
         return {"answer": answer, "sources": _sources(used), "used_ai": True}
-    except Exception:
+    except Exception as e:
         # Any API/key/network/model error degrades to the rule-based answer.
+        _log.warning("Ask agent failed (%s); using the rule-based answer", e)
         return fallback.answer(db, site, question)
 
 
