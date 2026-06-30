@@ -55,6 +55,7 @@ class _AnthropicProvider:
 
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self.model = settings.ai_model
+        self.name = "anthropic"
 
     def run_agent(self, system, user_text, tools, run_tool, max_iters=6):
         atools = [
@@ -121,12 +122,13 @@ class _AnthropicProvider:
 class _OpenAICompatProvider:
     """OpenAI / Ollama / Groq / OpenRouter — anything speaking the OpenAI API."""
 
-    def __init__(self, *, base_url, api_key, model, vision_model):
+    def __init__(self, *, base_url, api_key, model, vision_model, name="openai"):
         import openai
 
         self._client = openai.OpenAI(base_url=base_url or None, api_key=api_key or "not-needed")
         self.model = model
         self.vision_model = vision_model
+        self.name = name
 
     def run_agent(self, system, user_text, tools, run_tool, max_iters=6):
         otools = [
@@ -223,19 +225,19 @@ def _resolve():
 
     if provider == "ollama":
         return _OpenAICompatProvider(
-            base_url=settings.ollama_base_url, api_key="ollama",
+            base_url=settings.ollama_base_url, api_key="ollama", name="ollama",
             model=settings.ollama_model, vision_model=settings.ollama_vision_model,
         )
     if provider == "gemini":
         if not settings.gemini_api_key:
             return None
         return _OpenAICompatProvider(
-            base_url=_GEMINI_BASE_URL, api_key=settings.gemini_api_key,
+            base_url=_GEMINI_BASE_URL, api_key=settings.gemini_api_key, name="gemini",
             model=settings.gemini_model, vision_model=settings.gemini_model,
         )
     if provider == "openai":
         return _OpenAICompatProvider(
-            base_url=settings.openai_base_url, api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url, api_key=settings.openai_api_key, name="openai",
             model=settings.openai_model, vision_model=settings.openai_vision_model,
         )
     if provider == "anthropic" and settings.anthropic_api_key:
@@ -269,3 +271,13 @@ def get_provider():
 
 def ai_enabled() -> bool:
     return get_provider() is not None
+
+
+def active_info() -> dict:
+    """What the status endpoint reports: the REAL active provider + model (or
+    the rule-based fallback). Note: 'enabled' means a provider is configured,
+    not that its key is valid — a bad key still degrades to the fallback."""
+    p = get_provider()
+    if p is None:
+        return {"enabled": False, "provider": "fallback", "model": None}
+    return {"enabled": True, "provider": getattr(p, "name", "?"), "model": getattr(p, "model", None)}

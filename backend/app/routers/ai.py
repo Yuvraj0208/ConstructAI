@@ -11,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..database import get_db
 from ..deps import require_role
 from ..models import Budget, PurchaseOrder, Role, Site, User
@@ -30,7 +29,7 @@ from ..schemas import (
 )
 from ..services.ai import ask as ai_ask
 from ..services.ai import build_forecast, propose_budget
-from ..services.ai.client import ai_enabled
+from ..services.ai.provider import active_info
 from ..services.ai.draft import draft_orders
 from ..services.ai.notes import search_notes
 
@@ -78,7 +77,8 @@ def _forecast_out(db: Session, site: Site, budget: Budget) -> BudgetForecastOut:
 
 @router.get("/status", response_model=AiStatusOut)
 def ai_status() -> AiStatusOut:
-    return AiStatusOut(enabled=ai_enabled(), model=settings.ai_model)
+    info = active_info()
+    return AiStatusOut(enabled=info["enabled"], provider=info["provider"], model=info["model"])
 
 
 @router.post("/ask", response_model=AskResponse)

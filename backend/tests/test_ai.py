@@ -21,7 +21,7 @@ def test_ai_status_disabled_without_key(client):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["enabled"] is False  # no key in tests
-    assert body["model"]
+    assert body["provider"] == "fallback"
 
 
 def test_ask_recommends_ordering_grounded_in_data(client, seed_data):

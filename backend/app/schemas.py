@@ -305,8 +305,9 @@ class MaterialRequestOut(BaseModel):
 # AI layer: status, budgeting, natural-language insights
 # --------------------------------------------------------------------------- #
 class AiStatusOut(BaseModel):
-    enabled: bool  # True when a real Claude key is configured
-    model: str
+    enabled: bool  # True when a provider is configured (not a guarantee its key works)
+    provider: str | None = None  # the active backend: ollama | gemini | anthropic | openai | fallback
+    model: str | None = None
 
 
 class BudgetOut(BaseModel):
