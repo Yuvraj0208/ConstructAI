@@ -30,6 +30,7 @@ from ..schemas import (
 from ..services.ai import ask as ai_ask
 from ..services.ai import build_forecast, propose_budget
 from ..services.ai.provider import active_info
+from ..services.procurement import ensure_demo_orders
 from ..services.ai.draft import draft_orders
 from ..services.ai.notes import search_notes
 
@@ -103,6 +104,7 @@ def get_budget(
     _: User = Depends(require_role(Role.MANAGER)),
 ) -> BudgetForecastOut:
     site = _get_site(db, site_id)
+    ensure_demo_orders(db, site)  # so spend isn't empty on a long-running demo
     budget = db.scalar(select(Budget).where(Budget.site_id == site.id))
     if budget is None:  # first visit — generate the AI proposal
         budget = _apply_proposal(db, site, propose_budget(db, site))

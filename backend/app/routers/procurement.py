@@ -22,7 +22,7 @@ from ..models import (
 )
 from ..schemas import PurchaseOrderOut, RunResult, WeatherOut
 from ..services.inventory import add_batch, recompute_stock
-from ..services.procurement import generate_suggestions
+from ..services.procurement import ensure_demo_orders, generate_suggestions
 
 router = APIRouter(prefix="/procurement", tags=["procurement"])
 
@@ -81,6 +81,13 @@ def list_orders(
 ) -> list[PurchaseOrderOut]:
     """Managers see all orders at the selected site; stock handlers see approved
     (incoming) ones to receive; vendors see orders directed to them."""
+    # Backfill a demo procurement history the first time a site is viewed with none
+    # (no-op once real orders exist, and disabled in tests via settings.demo_autoseed).
+    if site_id is not None and user.role != Role.VENDOR:
+        site = db.get(Site, site_id)
+        if site is not None:
+            ensure_demo_orders(db, site)
+
     if user.role == Role.VENDOR:
         vendor = db.scalar(select(Vendor).where(Vendor.user_id == user.id))
         stmt = (

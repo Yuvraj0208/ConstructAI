@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..models import Material, POStatus, PurchaseOrder, Site, VendorOffer
+from ..config import settings
+from ..models import Material, POStatus, PurchaseOrder, Role, Site, User, VendorOffer
 from .weather import get_forecast
 
 RAIN_BUFFER_FACTOR = 1.20  # order 20% extra of weather-sensitive materials before rain
@@ -194,3 +196,66 @@ def generate_suggestions(db: Session, site: Site) -> tuple[list[PurchaseOrder], 
     for po in created:
         db.refresh(po)
     return created, weather, advisory
+
+
+def _add_demo_po(db, mat, offer, qty, status, created_days, decided_days, decided_by, why, now):
+    qty = round(max(1.0, qty), 1)
+    db.add(
+        PurchaseOrder(
+            material_id=mat.id,
+            vendor_id=offer.vendor_id,
+            offer_id=offer.id,
+            quantity=qty,
+            price_per_unit=offer.price_per_unit,
+            total_price=round(qty * offer.price_per_unit, 2),
+            eta_days=offer.eta_days,
+            status=status,
+            rationale=why,
+            created_at=now - timedelta(days=created_days),
+            decided_at=(now - timedelta(days=decided_days)) if decided_days is not None else None,
+            decided_by_id=decided_by,
+        )
+    )
+
+
+def ensure_demo_orders(db: Session, site: Site, *, force: bool = False) -> bool:
+    """Backfill a realistic procurement history for a site that has none, so the
+    procurement panel and budget spend are populated without a manual re-seed:
+    a delivered + an in-transit order per material, plus a pending suggestion for
+    any low-stock material. Idempotent — only runs when the site has zero orders.
+    Gated by settings.demo_autoseed unless forced (the seeder forces it)."""
+    if not force and not settings.demo_autoseed:
+        return False
+    existing = db.scalar(
+        select(func.count())
+        .select_from(PurchaseOrder)
+        .join(Material, PurchaseOrder.material_id == Material.id)
+        .where(Material.site_id == site.id)
+    )
+    if existing:
+        return False
+
+    manager = db.scalars(select(User).where(User.role == Role.MANAGER).order_by(User.id)).first()
+    manager_id = manager.id if manager else None
+    now = datetime.now(timezone.utc)
+    created = False
+    for mat in db.scalars(select(Material).where(Material.site_id == site.id)).all():
+        offers = db.scalars(select(VendorOffer).where(VendorOffer.material_id == mat.id)).all()
+        if not offers:
+            continue
+        cheapest = min(offers, key=lambda o: o.price_per_unit)
+        fastest = min(offers, key=lambda o: o.eta_days)
+        target = mat.target_stock or (mat.threshold * 2) or 100.0
+
+        _add_demo_po(db, mat, cheapest, target * 0.45, POStatus.DELIVERED, 12, 11, manager_id,
+                     "Bulk restock to target — lowest landed cost.", now)
+        _add_demo_po(db, mat, fastest, target * 0.30, POStatus.ORDERED, 3, 3, manager_id,
+                     "Expedited top-up — fastest ETA to cover near-term usage.", now)
+        if mat.current_stock < mat.threshold:
+            _add_demo_po(db, mat, cheapest, target - mat.current_stock, POStatus.SUGGESTED, 0, None, None,
+                         "Stock below threshold — refill to target at the best price.", now)
+        created = True
+
+    if created:
+        db.commit()
+    return created

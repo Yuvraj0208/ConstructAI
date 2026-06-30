@@ -58,6 +58,8 @@ def client(db_session, monkeypatch):
     monkeypatch.setattr("app.config.settings.openai_api_key", None)
     monkeypatch.setattr("app.config.settings.gemini_api_key", None)
     monkeypatch.setattr("app.config.settings.ai_provider", "")
+    # Keep procurement tests deterministic — no demo-order auto-backfill.
+    monkeypatch.setattr("app.config.settings.demo_autoseed", False)
 
     def override_get_db():
         yield db_session

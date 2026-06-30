@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # Default labour cost per worker-day (₹) used for budget & spend estimates.
     labor_rate_per_worker_day: float = 1200.0
 
+    # When True, a site with no purchase orders gets a realistic demo procurement
+    # history auto-created on first view (so the panel + budget spend are never
+    # empty without a manual re-seed). Tests turn this off.
+    demo_autoseed: bool = True
+
     # Database (SQLite by default for zero-setup local dev)
     database_url: str = "sqlite:///./constructai.db"
 

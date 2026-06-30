@@ -24,8 +24,6 @@ from .models import (
     MaterialRequestItem,
     Milestone,
     MovementType,
-    POStatus,
-    PurchaseOrder,
     Role,
     Site,
     StockBatch,
@@ -35,6 +33,7 @@ from .models import (
     VendorOffer,
 )
 from .security import hash_password
+from .services.procurement import ensure_demo_orders
 
 DEMO_PASSWORD = "password123"
 _rng = random.Random(42)
@@ -212,49 +211,6 @@ def _simple_material(
                 created_at=_now() - timedelta(days=days_ago, hours=_rng.randint(0, 8)),
             ))
     return material
-
-
-def _seed_procurement_history(db, *, manager_id: int) -> None:
-    """Give every site a procurement history so the procurement panel and the
-    budget spend are populated out of the box: a delivered order (spend actuals)
-    and an in-transit order per material, plus a pending suggestion for any
-    low-stock material (awaiting the manager's approval)."""
-    now = _now()
-
-    def add_po(mat, offer, qty, status, created_days, decided_days, decided_by, rationale):
-        qty = round(max(1.0, qty), 1)
-        db.add(
-            PurchaseOrder(
-                material_id=mat.id,
-                vendor_id=offer.vendor_id,
-                offer_id=offer.id,
-                quantity=qty,
-                price_per_unit=offer.price_per_unit,
-                total_price=round(qty * offer.price_per_unit, 2),
-                eta_days=offer.eta_days,
-                status=status,
-                rationale=rationale,
-                created_at=now - timedelta(days=created_days),
-                decided_at=(now - timedelta(days=decided_days)) if decided_days is not None else None,
-                decided_by_id=decided_by,
-            )
-        )
-
-    for mat in db.scalars(select(Material)).all():
-        offers = db.scalars(select(VendorOffer).where(VendorOffer.material_id == mat.id)).all()
-        if not offers:
-            continue
-        cheapest = min(offers, key=lambda o: o.price_per_unit)
-        fastest = min(offers, key=lambda o: o.eta_days)
-        target = mat.target_stock or (mat.threshold * 2) or 100
-
-        add_po(mat, cheapest, target * 0.45, POStatus.DELIVERED, 12, 11, manager_id,
-               "Bulk restock to target — lowest landed cost.")
-        add_po(mat, fastest, target * 0.30, POStatus.ORDERED, 3, 3, manager_id,
-               "Expedited top-up — fastest ETA to cover near-term usage.")
-        if mat.current_stock < mat.threshold:
-            add_po(mat, cheapest, target - mat.current_stock, POStatus.SUGGESTED, 0, None, None,
-                   "Stock below threshold — refill to target at the best price.")
 
 
 def _schema_ready(db) -> bool:
@@ -582,7 +538,8 @@ def seed(reset: bool = False) -> None:
 
         # Procurement history for every site (delivered + in-transit + pending
         # suggestions) so the procurement panel and budget spend are never empty.
-        _seed_procurement_history(db, manager_id=manager.id)
+        for s in db.scalars(select(Site)).all():
+            ensure_demo_orders(db, s, force=True)
 
         # Schedule milestones per site — varied dates so schedule risk is visible
         # (one done, one overdue, one due-soon, one further out).
