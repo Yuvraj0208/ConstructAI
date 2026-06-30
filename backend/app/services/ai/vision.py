@@ -20,7 +20,7 @@ _VISION_SCHEMA = {
             "type": "number",
             "description": "Estimated construction completion shown in the photo, 0-100.",
         },
-        "summary": {"type": "string", "description": "One line for the project manager."},
+        "summary": {"type": "string", "description": "One impactful sentence for the manager, leading with what matters most (milestone, risk or safety) — the 'so what', not a description."},
         "observations": {"type": "array", "items": {"type": "string"}},
         "safety_flags": {
             "type": "array",
@@ -42,12 +42,21 @@ _VISION_SCHEMA = {
 }
 
 _PROMPT = (
-    "You are a construction site supervisor reviewing a progress photo for the project "
-    "manager. Analyse the image and report: an estimated completion percentage, a concise "
-    "one-line summary, key observations, any visible safety issues (missing PPE, hazards — "
-    "leave empty if none), the construction materials you can see, and an overall status "
-    "(on_track, needs_attention, or blocked). Be specific and practical; if the image is "
-    "unclear or not a construction site, say so in the summary and use needs_attention."
+    "You are a senior site supervisor briefing a busy PROJECT MANAGER who will read this for "
+    "five seconds. Look at the photo and report only what helps them run the project.\n\n"
+    "Fields:\n"
+    "- progress_estimate: completion of the visible work (0-100).\n"
+    "- summary: ONE punchy sentence (max 25 words) leading with the single most important thing "
+    "for the manager — a milestone reached, a delay or quality risk, or a safety issue. Give the "
+    "'so what', not a plain description of what is in the frame.\n"
+    "- observations: up to 3 short, concrete points worth attention (pace vs progress, "
+    "workmanship, anything off). Each under 12 words. No filler.\n"
+    "- safety_flags: visible hazards or missing PPE the manager is accountable for (no edge "
+    "protection, no helmets/harnesses, unsafe scaffolding or access). Empty list if none.\n"
+    "- materials_visible: construction materials you can identify on site.\n"
+    "- status: on_track, needs_attention (a risk to manage now), or blocked (work cannot proceed).\n\n"
+    "Be specific, decisive and practical. If the image is unclear or not a construction site, say "
+    "so in summary and use needs_attention. Reply with ONLY minified JSON — no markdown, no code fences."
 )
 
 

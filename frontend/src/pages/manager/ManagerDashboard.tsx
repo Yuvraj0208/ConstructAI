@@ -216,12 +216,6 @@ export default function ManagerDashboard() {
     }
   }
 
-  const runProcurement = () =>
-    runAction('run', async () => {
-      const r = await api.post('/procurement/run', null, { params: { site_id: selectedSiteId } });
-      return r.data.message ?? 'Auto-procurement complete.';
-    });
-
   const draftOrders = () =>
     runAction('draft', async () => {
       const r = await api.post<unknown[]>('/ai/draft-orders', null, { params: { site_id: selectedSiteId } });
@@ -252,8 +246,7 @@ export default function ManagerDashboard() {
             <div className="text-lg font-bold">Quick actions</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <ActionBtn primary icon="bolt" label="Run procurement" loading={acting === 'run'} disabled={!!acting} onClick={runProcurement} />
-            <ActionBtn icon="sparkles" label="AI draft orders" loading={acting === 'draft'} disabled={!!acting} onClick={draftOrders} />
+            <ActionBtn primary icon="sparkles" label="AI draft orders" loading={acting === 'draft'} disabled={!!acting} onClick={draftOrders} />
             <ActionBtn icon="refresh" label="Re-propose budget" loading={acting === 'budget'} disabled={!!acting} onClick={reproposeBudget} />
             <ActionBtn icon="send" label="Ask AI" onClick={scrollToAi} />
             <Link

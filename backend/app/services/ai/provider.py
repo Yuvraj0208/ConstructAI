@@ -36,6 +36,9 @@ def _lenient_json(text: str) -> dict:
     text = (text or "").strip()
     if not text:
         return {}
+    # Strip ```json … ``` markdown fences some models wrap around the JSON.
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z0-9]*\s*|\s*```$", "", text).strip()
     try:
         return json.loads(text)
     except Exception:
@@ -139,7 +142,7 @@ class _OpenAICompatProvider:
         used: list[str] = []
         for _ in range(max_iters):
             resp = self._client.chat.completions.create(
-                model=self.model, messages=messages, tools=otools, max_tokens=1024
+                model=self.model, messages=messages, tools=otools, max_tokens=2048
             )
             msg = resp.choices[0].message
             calls = msg.tool_calls or []
@@ -175,7 +178,7 @@ class _OpenAICompatProvider:
                 {"role": "user", "content": content},
             ],
             response_format={"type": "json_object"},
-            max_tokens=1500,
+            max_tokens=2048,
         )
         return json.loads(resp.choices[0].message.content or "{}")
 
@@ -202,7 +205,7 @@ class _OpenAICompatProvider:
                 },
                 {"role": "user", "content": content},
             ],
-            max_tokens=1024,
+            max_tokens=4096,  # room for "thinking" models (e.g. gemini-2.5-flash) + the JSON
         )
         return _lenient_json(resp.choices[0].message.content or "")
 
