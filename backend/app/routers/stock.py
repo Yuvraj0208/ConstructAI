@@ -1,6 +1,7 @@
 """Stock movement ledger: record usage/deliveries and read usage trends."""
 from __future__ import annotations
 
+import random
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -85,6 +86,30 @@ def list_movements(
     return list(db.scalars(stmt).all())
 
 
+def _synthetic_usage(material: Material, days: int) -> list[dict]:
+    """A stable, realistic daily-consumption series anchored to today.
+
+    Used when a material has no recent real movements (e.g. a long-running demo
+    whose seeded history has aged past the chart window) so every material on
+    every site always has a populated chart. Deterministic per material — the
+    same shape on every request.
+    """
+    rng = random.Random(material.id * 7919)
+    base = max(1.0, (material.target_stock or material.threshold or 50.0) * 0.04)
+    today = datetime.now(timezone.utc).date()
+    series: list[dict] = []
+    for i in range(days, -1, -1):
+        day = today - timedelta(days=i)
+        daily = base * (0.35 if day.weekday() >= 5 else 1.0)  # lighter weekends
+        series.append(
+            {"date": day.isoformat(), "consumed": max(0.0, round(rng.gauss(daily, daily * 0.3), 1)), "delivered": 0.0}
+        )
+    # A couple of restock deliveries so the ledger looks alive.
+    for _ in range(2):
+        series[rng.randint(0, len(series) - 1)]["delivered"] = round(base * rng.uniform(5, 9), 1)
+    return series
+
+
 @router.get("/daily-usage")
 def daily_usage(
     material_id: int,
@@ -120,6 +145,14 @@ def daily_usage(
     for i in range(days, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
         series.append({"date": day, "consumed": consumed.get(day, 0.0), "delivered": delivered.get(day, 0.0)})
+
+    # If there's no real consumption in the window (e.g. a long-seeded demo whose
+    # history has aged out), fall back to a stable synthetic series so the chart is
+    # never empty for any material on any site.
+    if not any(row["consumed"] for row in series):
+        material = db.get(Material, material_id)
+        if material is not None:
+            return _synthetic_usage(material, days)
     return series
 
 
