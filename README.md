@@ -17,7 +17,8 @@ and now reasons about it all in plain English.
 ![React](https://img.shields.io/badge/React_19-20232A?logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?logo=tailwindcss&logoColor=white)
-![Claude](https://img.shields.io/badge/AI-Claude_Opus_4.8-D97757?logo=anthropic&logoColor=white)
+![AI](https://img.shields.io/badge/AI--native-provider--agnostic_agent-7C3AED?logo=openai&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Gemini_·_Claude_·_Ollama_·_OpenAI-4285F4?logo=googlegemini&logoColor=white)
 
 **Milestones 1–4 complete** · 4 role workspaces · 5 industries · auto-procurement engine · live weather · AI insights, budgeting, vision, note-search, scheduling, a portfolio rollup & a mobile field app
 
@@ -30,7 +31,7 @@ and now reasons about it all in plain English.
 - [What is ConstructAI?](#what-is-constructai)
 - [Highlights](#highlights)
 - [The four roles](#the-four-roles)
-- [The AI layer (Milestone 3)](#the-ai-layer-milestone-3)
+- [⭐ The AI layer (the heart of ConstructAI)](#the-ai-layer)
 - [How the procurement engine works](#how-the-procurement-engine-works)
 - [Tech stack](#tech-stack)
 - [Project structure](#project-structure)
@@ -97,7 +98,7 @@ account below — the login screen has one-click buttons; the free backend may t
 
 **🧠 AI layer** — natural-language insights, AI-proposed budgeting, site-photo vision
 analysis, keyword **note search**, an **AI purchase-order drafting agent**, and **schedule
-milestones** the AI reasons about (see [below](#the-ai-layer-milestone-3)).
+milestones** the AI reasons about (see [below](#the-ai-layer)).
 
 **📱 Field app (installable mobile PWA)** — a separate phone-first app in [`mobile/`](mobile)
 for **stock handlers & site engineers** to post from site: record movements, issue requests,
@@ -126,75 +127,100 @@ stock/procurement). Every role except Vendor gets a **site switcher** in the top
 
 ---
 
-## The AI layer (Milestone 3)
+## The AI layer
 
-The AI features run on a **pluggable LLM provider** — pick one with `AI_PROVIDER`:
-**Ollama** (local & free, no key), **Claude**, or any **OpenAI-compatible** host (OpenAI,
-Groq, OpenRouter…). Everything **degrades to a deterministic, rule-based engine when no
-provider is configured** — so the public demo always works at zero cost, and the dashboard
-shows a **"Live AI" / "Demo"** badge. Pick a provider and the same features run through it.
+> Most apps bolt a chatbot onto CRUD. ConstructAI is built the other way around: a
+> **provider-agnostic AI core** sits *over the live database* and reasons about
+> procurement, budget, schedule and site photos — and **every feature degrades to a
+> deterministic engine** when no model is set, so it's never a demo that only works with a
+> credit card.
 
-### 🔀 Pluggable provider & graceful fallback
-All four AI features run on whichever backend you choose with **`AI_PROVIDER`** — and a single
-[`provider.py`](backend/app/services/ai/provider.py) adapts each one's API (Anthropic's
-`messages` vs. the OpenAI `chat` format):
+```text
+   Manager ─►  Ask (agentic tool-use) · Budget (structured) · Draft orders (structured)
+   Engineer ─► Site-photo vision · Note search (RAG)
+                          │
+                          ▼   one adapter — four LLM call-sites
+                 ┌──────────────────┐   grounded in   live Postgres
+                 │   provider.py    │  ───────────►   (stock · offers · weather ·
+                 └──────────────────┘                  labour · spend · schedule)
+                          │
+   AI_PROVIDER ─►  Ollama (local/free) · Gemini (free tier) · Claude · any OpenAI-compatible
+                          │
+                          ▼   on ANY error / no key
+                 deterministic rule-based fallback   ← the demo always works, at ₹0
+```
+
+### 🔌 One abstraction, every model — with a real safety net
+A single [`provider.py`](backend/app/services/ai/provider.py) adapts each backend's API
+(Anthropic `messages` ⇄ OpenAI `chat`), so the **same four features** run on whatever you
+pick with **one env var**. Crucially, **every LLM call is wrapped to fall back to a rule-based
+engine** on *any* failure — missing key, model offline, malformed JSON, rate-limit. That's why
+the hosted demo runs at **₹0**, and why even a tiny local model that merely *describes* a photo
+still yields a usable report. `/ai/status` reports the **real active provider**, not a guess.
 
 | `AI_PROVIDER` | Backend | Cost | Notes |
 |---|---|---|---|
 | *(unset)* | **Rule-based fallback** | Free | Deterministic engine — the default; nothing to install |
-| `ollama` | **Local Ollama** | **Free** | Runs on your own machine: `llama3.1` (Ask / budget / draft orders) + `moondream` (photo vision). No key, no cloud, no per-call cost |
-| `gemini` | **Google Gemini** | **Free tier** | Hosted + multimodal → works on Render. `GEMINI_API_KEY` from [aistudio.google.com](https://aistudio.google.com) (rate-limited, no card) |
+| `gemini` | **Google Gemini** (multimodal) | **Free tier** | Hosted + does **vision** → powers the live demo. `GEMINI_API_KEY` from [aistudio.google.com](https://aistudio.google.com), no card |
+| `ollama` | **Local Ollama** | **Free** | On your own machine: `llama3.1` (text) + `moondream` (vision). No key, no cloud, no per-call cost |
 | `anthropic` | **Claude** | Paid | `ANTHROPIC_API_KEY` |
-| `openai` | **OpenAI · Groq · OpenRouter · …** | Paid | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for any OpenAI-compatible host) |
+| `openai` | **OpenAI · Groq · OpenRouter · …** | Paid | `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for any compatible host) |
 
-**Every call is wrapped so any failure — missing key, model offline, malformed output —
-silently degrades to the rule-based engine.** That's why the hosted demo always works with no
-provider, and why a tiny local model that merely *describes* a photo still yields a usable
-report. Uploaded photos are auto-converted to JPEG so any format (incl. WebP/HEIC) works with
-local vision models.
+### 🤖 Ask ConstructAI — an *agent*, not a prompt
+A chat panel on the manager dashboard. Ask *"what should I order?"*, *"why did cement usage
+spike?"*, or *"are we on budget?"* and it runs an **agentic tool-calling loop**: the model
+decides which tools to call and **pulls exactly the data it needs** (stock, vendor offers,
+weather, labour, spend, schedule) from the live DB *before* answering. This is the "contextual
+RAG" — structured tool-calls over real rows — so the answer is **grounded and can't hallucinate
+a number**, and **source chips** show exactly what it read.
 
-### 🧠 Ask ConstructAI — natural-language insights
-A chat panel on the manager dashboard. Ask things like *"what should I order?"*,
-*"why did cement usage spike?"*, or *"are we on budget?"* and get an answer **grounded
-in that site's live data**, with **source chips** showing what it looked at. With a key,
-it's an **agentic tool-calling loop**: Claude pulls exactly the data it needs (stock,
-vendor offers, weather, labour, spend, progress) before answering — the "contextual RAG"
-is structured tool-calls over the live database, so answers can't hallucinate the numbers.
+### 💰 AI budgeting that connects the whole site
+A **structured-output** model proposes a realistic budget by *connecting* vendor prices, labour
+(daily-update headcount × configurable rate), schedule progress and **weather risk** into
+materials / labour / contingency — then tracks **actual spend vs. budget** and forecasts overrun
+(*"projected ₹X exceeds the ₹Y budget at 45% complete; incoming rain may lift material costs"*).
+Re-propose with one click or fine-tune the totals.
 
-### 💰 Budget & Forecast — AI proposes, you adjust
-An **AI-proposed budget** that connects vendor prices, labour (daily-update headcount ×
-rate), schedule progress, and **weather risk** into materials / labour / contingency.
-It then tracks **actual spend vs. budget** and forecasts overrun risk
-(*"Overrun risk — projected ₹X exceeds the ₹Y budget at 45% complete; rain may lift
-material costs"*). The manager can **re-propose** or fine-tune the totals.
+### 📸 Site-photo vision → a manager's briefing
+An engineer snaps a progress photo; a **multimodal** model returns a *manager-first* structured
+report — completion %, the single most important **"so-what"** (a milestone, a delay, or a
+**safety/liability flag** like missing PPE), key observations, materials visible, and a status —
+straight into the manager's **photo-reports grid**. Uploads are **auto-converted to JPEG** (so
+WebP/HEIC work with local models), token budgets are sized for **"thinking" models**, and replies
+are parsed leniently so even a terse model produces a clean report. (Photos live in Postgres, so
+they survive the free tier's ephemeral disk.)
 
-### 📸 Site-photo vision analysis
-A site engineer uploads a progress photo; Claude **vision** returns a structured report —
-estimated completion %, key observations, **safety flags** (missing PPE / hazards),
-materials visible, and an overall status — which lands in the **manager's photo-reports
-grid**. (Photos are stored in Postgres so they survive the free tier's ephemeral disk.)
-
-### 🔎 Search the site log (note retrieval / RAG)
-Keyword search across the site's free-text history — daily updates, material requests,
-purchase-order rationales, stock notes and photo reports — so the agent can recall *why*
-something happened. It's both a **"search the site log"** box and a tool the agent calls.
-Lexical today, with a clean seam to add real vector embeddings behind a key later.
-
-### 🧾 AI draft-orders agent
+### 🧾 AI draft-orders agent — proposes, never invents
 One click drafts purchase orders for the manager to approve. The agent only ever picks from
-**real** vendor offers and stays within the **remaining budget** — so it can't invent prices
-or vendors. With no key it falls back to the deterministic auto-procurement engine.
+**real vendor offers** and stays within the **remaining budget** — it cannot conjure a price or a
+vendor. No key? It falls back to the deterministic auto-procurement engine, so the button always
+works.
 
-### 🗓️ Schedule milestones
-Per-site milestones with **overdue / at-risk** tracking. The AI folds schedule risk into its
-answers (*"Phase 2 overdue by 4 days"*); the labour rate that drives the budget is editable
-inline.
+### 🔎 RAG over the site's history
+Retrieval across the site's free-text memory — daily updates, material requests, PO rationales,
+stock notes and photo reports — exposed both as a **"search the site log"** box *and* as a tool
+the agent calls to recall *why* something happened. Lexical today, with a clean seam to drop in
+vector embeddings behind a key.
 
-> **Turn on real AI:** for **free & local**, install [Ollama](https://ollama.com), pull
-> `llama3.1` + `llama3.2-vision`, and run the backend with `AI_PROVIDER=ollama` — no key, no
-> per-call cost (great for dev; it can't run on Render's free tier, so the hosted demo stays
-> on the fallback). For a **hosted** model, set `AI_PROVIDER=anthropic`/`openai` + the key.
-> No provider = the rule-based demo keeps running for free. (See [DEPLOYMENT.md](DEPLOYMENT.md).)
+### 🗓️ Schedule the AI reasons about
+Per-site milestones with **overdue / at-risk** tracking that the model **folds into its answers**
+(*"Phase 2 is overdue by 4 days"*); the labour rate that drives the budget is editable inline.
+
+### ✨ Why it's engineered, not just wired up
+- **Grounded, not guessed** — the agent reads numbers via structured tool-calls / RAG over the
+  live DB; prices and vendors come from real rows, never the model's imagination.
+- **Graceful degradation** — four LLM call-sites, each wrapped; a failure becomes a deterministic
+  result, **never a 500**. Errors are logged so you can see *why* it fell back.
+- **Provider-portable** — local ⇄ free-hosted ⇄ paid with **one variable**, zero code change; a
+  single adapter normalises tool-use, structured JSON and vision across very different APIs.
+- **Always-on demo** — the rule-based fallback (and synthetic demo data) means every chart, panel
+  and insight is populated for every site, with or without a key.
+
+> **Turn on real AI** — **hosted & free:** set `AI_PROVIDER=gemini` + a free `GEMINI_API_KEY`
+> (multimodal, so vision works on the live site). **Local & free:** install
+> [Ollama](https://ollama.com), pull `llama3.1` + `moondream`, run with `AI_PROVIDER=ollama`.
+> **Paid:** `anthropic` / `openai` + a key. No provider = the rule-based demo runs for free.
+> Full guide in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ---
 
@@ -222,7 +248,7 @@ Everything is unit-tested (urgency curve, scoring, multi-vendor allocation, rain
 | Layer | Tech |
 |-------|------|
 | **Backend** | FastAPI · SQLAlchemy 2.0 · **PostgreSQL** (psycopg; SQLite for tests/dev) · Alembic migrations · Pydantic v2 · JWT (PyJWT) + PBKDF2 hashing |
-| **AI** | Pluggable provider — **Ollama** (local/free), **Claude**, or any **OpenAI-compatible** host (tool-use agent, structured-output budgeting, vision) with a rule-based no-key fallback |
+| **AI** | Provider-agnostic core ([`provider.py`](backend/app/services/ai/provider.py)) — **Gemini** (free tier), **Ollama** (local/free), **Claude**, or any **OpenAI-compatible** host. Agentic tool-use, structured-output budgeting/drafting, multimodal vision, lexical RAG — all with a deterministic no-key fallback |
 | **Frontend** | React 19 · TypeScript · Vite · Tailwind CSS v4 · Recharts · React Router (lazy/code-split) · axios |
 | **Weather** | Open-Meteo (key-less) + offline simulation |
 | **Deploy** | Vercel (frontend) · Render (FastAPI + Postgres, blueprint) · GitHub Actions keep-warm |
@@ -298,8 +324,9 @@ python -m venv .venv
 
 API → http://localhost:8000 · interactive docs → http://localhost:8000/docs
 
-> **Optional — enable live Claude:** add `ANTHROPIC_API_KEY=sk-ant-...` to `backend/.env`.
-> Without it, the AI features run in rule-based demo mode.
+> **Optional — enable live AI:** add one provider to `backend/.env` — e.g.
+> `AI_PROVIDER=gemini` + `GEMINI_API_KEY=...` (free), or `AI_PROVIDER=ollama` (local/free).
+> Without any, the AI features run in rule-based demo mode.
 
 ### 3. Frontend  *(terminal 2)*
 
@@ -331,7 +358,7 @@ cd backend
 .venv/Scripts/python.exe -m pytest
 ```
 
-**41 tests** — engine (urgency, scoring, allocation, rain buffer), inventory
+**43 tests** — engine (urgency, scoring, allocation, rain buffer), inventory
 (reserve/available, batch FIFO, expiry buckets), API lifecycle (auth, role guards, site
 scoping, suggest→approve→accept→receive, engineer daily-update + material-request →
 issue), and the AI layer (status, insights, budgeting, photo vision, note search, AI
@@ -344,7 +371,8 @@ draft-orders, schedule milestones, portfolio rollup) on the no-key path.
 Frontend → **Vercel**, backend + Postgres → **Render**, both straight from this repo.
 It's pre-wired ([`render.yaml`](render.yaml), [`frontend/vercel.json`](frontend/vercel.json),
 keep-warm workflow) and **auto-migrates + seeds demo data on deploy**. Set
-`ANTHROPIC_API_KEY` on Render to switch the AI from demo to live. Full step-by-step:
+`AI_PROVIDER=gemini` + a free `GEMINI_API_KEY` on Render to switch the AI from demo to live
+(multimodal, so site-photo vision works on the hosted site too). Full step-by-step:
 **[DEPLOYMENT.md](DEPLOYMENT.md)**.
 
 ---
@@ -450,12 +478,12 @@ Interactive OpenAPI docs are at `/docs`. Highlights:
   `alembic revision --autogenerate -m "..."` then `alembic upgrade head`.
   `python -m app.seed --reset` resets demo **data** only.
 - **Secrets:** `SECRET_KEY` defaults to a dev value — set a real one in `.env` before any
-  real deployment. `ANTHROPIC_API_KEY` is optional (enables live Claude). Neither is
-  committed.
+  real deployment. A provider key (e.g. `GEMINI_API_KEY`) is optional — it flips the AI from
+  rule-based demo to live. Neither is committed.
 - **Local dev** built on Python 3.14; Render pins Python 3.12.6 (the app supports 3.12+).
 
 <div align="center">
 
-**[▶ Live demo](https://construct-ai-eosin.vercel.app)** · Built with FastAPI, React & Claude
+**[▶ Live demo](https://construct-ai-eosin.vercel.app)** · Built with FastAPI, React & a provider-agnostic AI core
 
 </div>
