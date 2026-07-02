@@ -129,6 +129,7 @@ class _OpenAICompatProvider:
         import openai
 
         self._client = openai.OpenAI(base_url=base_url or None, api_key=api_key or "not-needed")
+        self.base_url = base_url
         self.model = model
         self.vision_model = vision_model
         self.name = name
@@ -186,9 +187,13 @@ class _OpenAICompatProvider:
         return self._json(self.model, system, user_text, schema)
 
     def complete_vision_json(self, system, user_text, image_bytes, media_type, schema):
-        # Small local vision models (e.g. moondream) often can't honour
-        # response_format / strict JSON, so we ask plainly and parse leniently —
-        # a plain description still becomes the report's summary.
+        # Local Ollama vision models (e.g. moondream) are unreliable through the
+        # OpenAI-compat image_url path — they often ignore the image and reply
+        # like a generic chatbot ("I am an AI assistant..."). Use Ollama's NATIVE
+        # API (which attaches the image via the `images` field) with a simple,
+        # direct prompt; the description then becomes the report's summary.
+        if self.name == "ollama":
+            return self._ollama_vision(image_bytes)
         b64 = base64.standard_b64encode(image_bytes).decode("ascii")
         content = [
             {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64}"}},
@@ -208,6 +213,37 @@ class _OpenAICompatProvider:
             max_tokens=4096,  # room for "thinking" models (e.g. gemini-2.5-flash) + the JSON
         )
         return _lenient_json(resp.choices[0].message.content or "")
+
+    def _ollama_native_url(self) -> str:
+        base = (self.base_url or "http://localhost:11434/v1").rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3].rstrip("/")
+        return base + "/api/chat"
+
+    def _ollama_vision(self, image_bytes: bytes) -> dict:
+        """Vision via Ollama's native /api/chat (reliable image attachment)."""
+        import urllib.request
+
+        b64 = base64.standard_b64encode(image_bytes).decode("ascii")
+        prompt = (
+            "You are a construction site supervisor. Look carefully at this site photo and "
+            "describe, in 2-4 specific sentences: the overall build progress, the main "
+            "structures or materials visible, and any visible safety issues (missing helmets, "
+            "no edge protection, unsafe access). Be factual about what you actually see."
+        )
+        body = json.dumps({
+            "model": self.vision_model,
+            "messages": [{"role": "user", "content": prompt, "images": [b64]}],
+            "stream": False,
+            "options": {"num_predict": 512},
+        }).encode()
+        req = urllib.request.Request(
+            self._ollama_native_url(), data=body, headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            data = json.loads(resp.read().decode())
+        text = ((data.get("message") or {}).get("content") or "").strip()
+        return _lenient_json(text)
 
 
 # Gemini's OpenAI-compatible endpoint (free tier, multimodal).
