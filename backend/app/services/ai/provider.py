@@ -226,10 +226,13 @@ class _OpenAICompatProvider:
 
         b64 = base64.standard_b64encode(image_bytes).decode("ascii")
         prompt = (
-            "You are a construction site supervisor. Look carefully at this site photo and "
-            "describe, in 2-4 specific sentences: the overall build progress, the main "
-            "structures or materials visible, and any visible safety issues (missing helmets, "
-            "no edge protection, unsafe access). Be factual about what you actually see."
+            "You are a site supervisor reporting the STATUS of this building's construction to "
+            "the project manager. Based only on what you see in the photo, give a short status "
+            "update in 2-3 sentences covering: (1) what construction stage the building is at "
+            "(foundation, structural frame, brickwork/walls, or finishing) and roughly how "
+            "complete it looks; (2) the main materials or structures visible; and (3) any "
+            "safety concern. Write it as a building progress report, not a generic image "
+            "description. Begin with 'Building status:'."
         )
         body = json.dumps({
             "model": self.vision_model,
