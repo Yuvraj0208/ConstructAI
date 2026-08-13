@@ -1,8 +1,10 @@
-# Render Blueprint — provisions a Postgres database + the FastAPI backend.
+# Render Blueprint — provisions the FastAPI backend.
 # In Render: New → Blueprint → connect this repo. Everything below is auto-applied.
-databases:
-  - name: constructai-db
-    plan: free
+#
+# NOTE: the database is deliberately NOT provisioned here. Render's free Postgres
+# is deleted after 30 days, which takes the whole app down. Use a free Postgres
+# that doesn't expire instead — Neon (https://neon.com) — and paste its connection
+# string into the DATABASE_URL env var below. See DEPLOYMENT.md §1.
 
 services:
   - type: web
@@ -17,17 +19,23 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
+      # Paste your Neon connection string here in the Render dashboard
+      # (Environment tab). Looks like:
+      #   postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require
       - key: DATABASE_URL
-        fromDatabase:
-          name: constructai-db
-          property: connectionString
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       # Allow the Vercel frontend (production + preview URLs) to call the API.
       - key: CORS_ORIGIN_REGEX
         value: "https://.*\\.vercel\\.app"
-      # Optional — set this in the Render dashboard to switch the AI features from
-      # the rule-based demo fallback to live Claude. Leave unset to keep the free
-      # demo working at no cost.
-      - key: ANTHROPIC_API_KEY
+      # Optional — switch the AI features from the rule-based demo fallback to a
+      # live model. Set these two in the Render dashboard for Google Gemini's FREE
+      # tier (key from https://aistudio.google.com): AI_PROVIDER=gemini and your
+      # GEMINI_API_KEY. Leave unset to keep the free demo working at no cost.
+      - key: AI_PROVIDER
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
         sync: false

@@ -10,9 +10,16 @@ from .config import settings
 
 # SQLite needs check_same_thread=False so the connection can be shared across
 # FastAPI's threadpool. For other databases this argument is ignored.
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+is_sqlite = settings.database_url.startswith("sqlite")
+connect_args = {"check_same_thread": False} if is_sqlite else {}
 
-engine = create_engine(settings.database_url, connect_args=connect_args, future=True)
+# Serverless Postgres (Neon, Supabase…) suspends idle compute, so a connection
+# sitting in the pool is often dead by the next request. pool_pre_ping checks it
+# first and reconnects transparently instead of raising; pool_recycle drops
+# connections before the provider does.
+pool_args = {} if is_sqlite else {"pool_pre_ping": True, "pool_recycle": 300}
+
+engine = create_engine(settings.database_url, connect_args=connect_args, future=True, **pool_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 
